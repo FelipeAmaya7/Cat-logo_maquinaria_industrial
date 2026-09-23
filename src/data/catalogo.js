@@ -57,14 +57,50 @@ export const catalogoInicial = [...maquinasConFotografia]
 export const idsCatalogoInicial = catalogoInicial.map((maquina) => maquina.id)
 
 /**
+ * Conjunto de fotografías realmente extraídas del Excel, usado como respaldo.
+ * Solo contiene nombres de archivos que el script escribió en public/maquinas/,
+ * así que cualquier imagen tomada de aquí existe en disco.
+ */
+const RESPALDOS = maquinasConFotografia.map((maquina) => maquina.imagen)
+
+/**
+ * Garantiza que una máquina tenga fotografía.
+ *
+ * El catálogo inicial ya se arma solo con máquinas que tienen foto propia, así
+ * que esta red de seguridad no debería activarse. Existe para que un cambio en
+ * el Excel —una hoja a la que le quiten la imagen— nunca deje una tarjeta o una
+ * ficha sin fotografía.
+ *
+ * Cuando la imagen es prestada se marca con `imagenEsRespaldo`, porque mostrar
+ * la foto de otra máquina sin advertirlo sería engañoso en un catálogo técnico.
+ *
+ * @param {import('./maquinas').Maquina} maquina
+ * @param {number} indice Posición en el listado, para repartir los respaldos.
+ */
+function conFotografiaGarantizada(maquina, indice) {
+  if (maquina.imagen) return maquina
+  if (RESPALDOS.length === 0) return maquina
+
+  return {
+    ...maquina,
+    imagen: RESPALDOS[indice % RESPALDOS.length],
+    imagenEsRespaldo: true,
+  }
+}
+
+/**
  * Resuelve una lista de identificadores a sus objetos de máquina.
  * Ignora los ids que ya no existan en el catálogo generado, de modo que un
- * cambio en el Excel no deje la interfaz con huecos.
+ * cambio en el Excel no deje la interfaz con huecos, y garantiza fotografía.
  *
  * @param {string[]} ids
  * @returns {import('./maquinas').Maquina[]}
  */
 export function obtenerMaquinasPorId(ids) {
   const porId = new Map(maquinas.map((maquina) => [maquina.id, maquina]))
-  return ids.map((id) => porId.get(id)).filter(Boolean)
+
+  return ids
+    .map((id) => porId.get(id))
+    .filter(Boolean)
+    .map(conFotografiaGarantizada)
 }

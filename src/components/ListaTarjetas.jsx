@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { rutaImagen } from '../data/maquinas'
+import { resolverFotografia } from '../data/fotografias'
 
 /**
  * Colores del distintivo según la disponibilidad operativa.
@@ -16,7 +16,7 @@ const ESTILO_POR_DEFECTO = 'bg-slate-50 text-slate-600 ring-slate-200'
 /** Marco de la fotografía con respaldo cuando el archivo aún no existe. */
 function Miniatura({ maquina }) {
   const [falloImagen, setFalloImagen] = useState(false)
-  const src = rutaImagen(maquina.imagen)
+  const src = resolverFotografia(maquina.imagen)
 
   if (!src || falloImagen) {
     return (

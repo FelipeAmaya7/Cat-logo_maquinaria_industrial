@@ -65,7 +65,7 @@ function Autenticacion({ onAutenticar }) {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100 px-4 py-10">
-      <main className="w-full max-w-md">
+      <main className="w-full max-w-sm px-4 sm:max-w-md sm:px-0">
         <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm">
           {/* Membrete institucional */}
           <div className="border-b-4 border-red-600 px-6 py-6 text-center">

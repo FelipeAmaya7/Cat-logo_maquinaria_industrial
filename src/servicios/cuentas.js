@@ -22,9 +22,25 @@ import { idsCatalogoInicial } from '../data/catalogo'
 const CLAVE_CUENTAS = 'cuentas'
 const CLAVE_SESION = 'sesion'
 const CLAVE_CATALOGO = 'catalogo'
+const CLAVE_EDICIONES = 'ediciones'
+const CLAVE_PROPIAS = 'maquinas-propias'
+const CLAVE_VERSION = 'version-catalogo'
 
 /** Cuenta precargada la primera vez que se abre la aplicación. */
 const CUENTA_INICIAL = { usuario: 'jhamilamaya', contrasena: '12345' }
+
+/**
+ * Versión de la asignación inicial de máquinas.
+ *
+ * El sembrado es idempotente sobre la CUENTA: si ya existe, no se toca. Eso
+ * dejaba un problema real: cuando cambia la definición del catálogo inicial, un
+ * navegador que ya había abierto la aplicación conservaba la asignación vieja
+ * para siempre, con identificadores que podían ya no existir.
+ *
+ * Subir este número fuerza una única resincronización del catálogo de la cuenta
+ * precargada. No toca su contraseña, ni sus ediciones, ni a los demás usuarios.
+ */
+const VERSION_CATALOGO = 2
 
 export const LONGITUD_MINIMA_CONTRASENA = 5
 
@@ -86,16 +102,26 @@ async function construirCuenta(usuario, contrasena) {
  */
 export async function sembrarDatosIniciales() {
   const cuentas = leerCuentas()
-  if (cuentas[CUENTA_INICIAL.usuario]) return
+  const claveCatalogo = `${CLAVE_CATALOGO}:${CUENTA_INICIAL.usuario}`
 
-  cuentas[CUENTA_INICIAL.usuario] = await construirCuenta(
-    CUENTA_INICIAL.usuario,
-    CUENTA_INICIAL.contrasena,
-  )
+  if (!cuentas[CUENTA_INICIAL.usuario]) {
+    cuentas[CUENTA_INICIAL.usuario] = await construirCuenta(
+      CUENTA_INICIAL.usuario,
+      CUENTA_INICIAL.contrasena,
+    )
+    escribir(CLAVE_CUENTAS, cuentas)
+    // Solo esta cuenta arranca con máquinas asignadas.
+    escribir(claveCatalogo, idsCatalogoInicial)
+    escribir(CLAVE_VERSION, VERSION_CATALOGO)
+    return
+  }
 
-  escribir(CLAVE_CUENTAS, cuentas)
-  // Solo esta cuenta arranca con máquinas asignadas.
-  escribir(`${CLAVE_CATALOGO}:${CUENTA_INICIAL.usuario}`, idsCatalogoInicial)
+  // La cuenta ya existía: se resincroniza su catálogo solo si la definición
+  // cambió desde la última vez que este navegador la guardó.
+  if (leer(CLAVE_VERSION, 1) !== VERSION_CATALOGO) {
+    escribir(claveCatalogo, idsCatalogoInicial)
+    escribir(CLAVE_VERSION, VERSION_CATALOGO)
+  }
 }
 
 /**
@@ -180,4 +206,87 @@ export function cerrarSesion() {
  */
 export function maquinasDeUsuario(usuario) {
   return leer(`${CLAVE_CATALOGO}:${normalizar(usuario)}`, [])
+}
+
+/**
+ * Ediciones que un usuario ha hecho sobre sus fichas técnicas.
+ *
+ * Se guardan como PARCHES por máquina —solo los campos modificados— y no como
+ * copias completas. Así, si el Excel se vuelve a extraer con datos nuevos, la
+ * ficha se actualiza en todo lo que la persona no haya tocado.
+ *
+ * @param {string} usuario
+ * @returns {Object<string, Object>} { [idMaquina]: { campo: valor } }
+ */
+export function leerEdiciones(usuario) {
+  return leer(`${CLAVE_EDICIONES}:${normalizar(usuario)}`, {})
+}
+
+/**
+ * Guarda el parche de una ficha y devuelve el mapa completo de ediciones ya
+ * actualizado, para que la interfaz refresque sin releer el almacenamiento.
+ *
+ * INVARIANTE: `cambios` es el parche COMPLETO de la máquina respecto al
+ * catálogo generado, no un incremento sobre el parche guardado. Aquí se
+ * reemplaza, no se mezcla: quien llame con una diferencia parcial borrará las
+ * ediciones anteriores de esa ficha.
+ *
+ * @param {string} usuario
+ * @param {string} idMaquina
+ * @param {Object} cambios Todos los campos que difieren del original.
+ * @returns {{ok: boolean, ediciones: Object}}
+ */
+/**
+ * Fichas que el usuario ha cargado él mismo desde un archivo de Excel.
+ *
+ * Se guardan COMPLETAS —no como identificadores— porque no existen en el
+ * catálogo generado: su única copia es esta.
+ *
+ * @param {string} usuario
+ * @returns {Object[]}
+ */
+export function maquinasPropias(usuario) {
+  return leer(`${CLAVE_PROPIAS}:${normalizar(usuario)}`, [])
+}
+
+/**
+ * Añade una ficha cargada por el usuario a su catálogo.
+ *
+ * @param {string} usuario
+ * @param {Object} maquina
+ * @returns {{ok: boolean, error?: string, maquinas?: Object[]}}
+ */
+export function agregarMaquinaPropia(usuario, maquina) {
+  const clave = `${CLAVE_PROPIAS}:${normalizar(usuario)}`
+  const propias = leer(clave, [])
+
+  if (propias.some((existente) => existente.id === maquina.id)) {
+    return { ok: false, error: 'Ya existe una ficha con esa placa en tu catálogo.' }
+  }
+
+  const siguientes = [...propias, maquina]
+
+  if (!escribir(clave, siguientes)) {
+    // La causa habitual es la cuota de localStorage, que ronda los 5 MB.
+    return {
+      ok: false,
+      error: 'No se pudo guardar: el almacenamiento del navegador está lleno o bloqueado.',
+    }
+  }
+
+  return { ok: true, maquinas: siguientes }
+}
+
+export function guardarEdicion(usuario, idMaquina, cambios) {
+  const clave = `${CLAVE_EDICIONES}:${normalizar(usuario)}`
+  const ediciones = leer(clave, {})
+
+  if (Object.keys(cambios).length === 0) {
+    // Volvió a los valores originales: se descarta el parche entero.
+    delete ediciones[idMaquina]
+  } else {
+    ediciones[idMaquina] = cambios
+  }
+
+  return { ok: escribir(clave, ediciones), ediciones }
 }
