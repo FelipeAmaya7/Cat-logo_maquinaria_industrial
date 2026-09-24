@@ -1,0 +1,43 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Libros de Excel: son la FUENTE de src/data/maquinas.js, no un artefacto del
+# despliegue. Pesan decenas de MB y contienen el inventario completo de planta,
+# así que se mantienen locales y solo se publica lo que genera `npm run datos`.
+*.xlsx
+*.xlsm
+*.xls
+*.xlsb
+*.xltx
+~$*.xls*
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+
+# Artefactos de despliegue
+.cache/
+node_modules/.vite/
