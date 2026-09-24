@@ -1,12 +1,13 @@
-import { INSTITUCION, RUTA_LOGO } from '../data/institucion'
+import { INSTITUCION } from '../data/institucion'
+import { DistintivoSistema } from './IconoSistema'
 
 /**
- * Encabezado institucional.
- * Componente de presentación puro: no recibe props ni maneja estado.
+ * Encabezado del sistema.
+ * Componente de presentación puro: solo recibe el usuario y el cierre de sesión.
  *
- * El logo oficial ya contiene el nombre de la empresa, así que el <h1> se deja
- * accesible para lectores de pantalla pero oculto visualmente: así no se repite
- * la marca dos veces en pantalla sin perder la estructura semántica.
+ * Antes el nombre de la organización venía dentro del logo, así que el <h1>
+ * quedaba oculto para no repetirlo. Ahora que el distintivo es un ícono genérico
+ * sin texto, el título es visible: es el único sitio donde se nombra el sistema.
  *
  * @param {Object} props
  * @param {string} props.usuario                Usuario con la sesión abierta.
@@ -14,18 +15,16 @@ import { INSTITUCION, RUTA_LOGO } from '../data/institucion'
  */
 function Header({ usuario, onCerrarSesion }) {
   return (
-    <header className="border-b-4 border-red-600 bg-white shadow-sm">
+    <header className="border-b-4 border-industrial-800 bg-white shadow-sm">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="flex items-center gap-4">
-          <img
-            src={RUTA_LOGO}
-            alt={`Logo de ${INSTITUCION.nombre}`}
-            className="h-12 w-auto shrink-0"
-          />
+          <DistintivoSistema className="h-12 w-12" claseIcono="h-6 w-6" />
 
-          <div className="border-l border-gray-300 pl-4">
-            <h1 className="sr-only">{INSTITUCION.nombre}</h1>
-            <p className="text-sm font-semibold text-gray-800">{INSTITUCION.subtitulo}</p>
+          <div className="min-w-0 border-l border-gray-300 pl-4">
+            <h1 className="text-sm font-bold uppercase tracking-wide text-gray-800">
+              {INSTITUCION.titulo}
+            </h1>
+            <p className="text-xs text-gray-500">{INSTITUCION.subtitulo}</p>
           </div>
         </div>
 

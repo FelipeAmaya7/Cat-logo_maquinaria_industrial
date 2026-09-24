@@ -25,146 +25,24 @@ import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import xlsx from 'xlsx'
 import { extraerImagenes } from './extraer-imagenes.mjs'
+import {
+  MAPA_CAMPOS,
+  SIN_DATO,
+  extraerFicha,
+  normalizarClave,
+  textoCelda,
+} from '../src/servicios/anclajeRotulos.js'
 
 const raizProyecto = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ARCHIVO_EXCEL = resolve(raizProyecto, 'FICHAS TECNICAS MAQUINAS.xlsm')
 const ARCHIVO_SALIDA = resolve(raizProyecto, 'src/data/maquinas.js')
 const CARPETA_MAQUINAS = resolve(raizProyecto, 'public/maquinas')
-const ARCHIVO_LOGO = resolve(raizProyecto, 'public/logo-empaques-cartones')
 
 /** Hojas que no son fichas técnicas. */
 const HOJAS_OMITIDAS = new Set(['INDICE', 'Fisico'])
 
-/** Campo del modelo -> rótulo tal como aparece en el formato de planta. */
-const MAPA_CAMPOS = {
-  placaNueva: 'PLACA NUEVA',
-  placaPadre: 'PLACAPADRE',
-  cantidad: 'CANTIDAD',
-  descripcion: 'DESCRIPCIÓN',
-  anioAdquisicion: 'AÑO DE ADQUISCION',
-  nuevoUsado: 'NUEVO-USADO',
-  vidaUtil: 'VIDA ÚTIL EN AÑOS',
-  estado: 'ESTADO',
-  disponibilidad: 'DISPONIBILIDAD',
-  horasUso: 'HORAS DE USO',
-  aniosUso: 'AÑOS DE USO',
-  ubicacion: 'UBICACIÓN',
-  piso: 'PISO',
-  material: 'MATERIAL',
-  color: 'COLOR',
-  dimension: 'DIMENSIÓN',
-  marca: 'MARCA',
-  modelo: 'MODELO',
-  serie: 'SERIE',
-  turnoPorDia: 'TURNO POR DÍA',
-  especificaciones: 'ESPECIFICACIONES',
-  funcion: 'FUNCIÓN QUE PRESTA',
-  materialProcesado: 'MATERIAL PROCESADO',
-  capacidad: 'CAPACIDAD PRODUCTIVA',
-}
-
-/** Marcadores que en el formato significan "campo sin diligenciar". */
-const MARCADORES_VACIOS = new Set(['', '.', '..', '-', '--', '0', 'N/A'])
-const SIN_DATO = 'No registrado'
-
-const normalizar = (texto) =>
-  String(texto ?? '')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-/** Quita tildes y mayúsculas para comparar rótulos de forma tolerante. */
-const clave = (texto) =>
-  normalizar(texto)
-    .toUpperCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-
-/** Todos los rótulos del formato, normalizados, para reconocerlos en la hoja. */
-const ETIQUETAS_CONOCIDAS = new Set(Object.values(MAPA_CAMPOS).map(clave))
-
-/** Texto ya formateado por Excel ('w' respeta fechas y decimales). */
-const textoCelda = (celda) => (celda ? normalizar(celda.w ?? celda.v) : '')
-
-/**
- * Índice { ROTULO -> { celdaValor, fila } } con la primera aparición de cada rótulo.
- * Recorre la hoja fila por fila para poder acotar cada valor al siguiente rótulo.
- */
-function indexarRotulos(hoja) {
-  const filas = new Map()
-
-  // 1. Agrupar las celdas con contenido por fila.
-  for (const direccion of Object.keys(hoja)) {
-    if (direccion.startsWith('!')) continue
-
-    const partes = /^([A-Z]+)(\d+)$/.exec(direccion)
-    if (!partes) continue
-
-    const texto = textoCelda(hoja[direccion])
-    if (!texto) continue
-
-    const fila = Number(partes[2])
-    if (!filas.has(fila)) filas.set(fila, [])
-    filas.get(fila).push({ direccion, columna: xlsx.utils.decode_col(partes[1]), texto })
-  }
-
-  const indice = new Map()
-
-  // 2. En cada fila, emparejar rótulo -> primer valor a su derecha.
-  for (const [fila, celdas] of [...filas.entries()].sort((a, b) => a[0] - b[0])) {
-    celdas.sort((a, b) => a.columna - b.columna)
-
-    celdas.forEach((celda, posicion) => {
-      const rotulo = clave(celda.texto)
-      if (!ETIQUETAS_CONOCIDAS.has(rotulo)) return
-
-      // El bloque principal siempre está por encima de los anexos: gana el más alto.
-      if (indice.has(rotulo)) return
-
-      // El valor no puede invadir el rótulo siguiente de la misma fila.
-      const valor = celdas
-        .slice(posicion + 1)
-        .find((siguiente) => !ETIQUETAS_CONOCIDAS.has(clave(siguiente.texto)))
-
-      const rotuloSiguiente = celdas
-        .slice(posicion + 1)
-        .find((siguiente) => ETIQUETAS_CONOCIDAS.has(clave(siguiente.texto)))
-
-      const invadeOtroRotulo =
-        valor && rotuloSiguiente && valor.columna > rotuloSiguiente.columna
-
-      indice.set(rotulo, {
-        celdaValor: valor && !invadeOtroRotulo ? valor.direccion : null,
-        fila,
-      })
-    })
-  }
-
-  return indice
-}
-
-/** Lee un campo por su rótulo; devuelve el valor crudo o null si no existe el rótulo. */
-function leerCampo(hoja, indice, rotulo) {
-  const ubicacion = indice.get(clave(rotulo))
-  if (!ubicacion) return null
-  if (!ubicacion.celdaValor) return ''
-
-  return textoCelda(hoja[ubicacion.celdaValor])
-}
-
-/** Convierte marcadores de relleno en un texto uniforme. */
-const limpiar = (valor) =>
-  valor === null || MARCADORES_VACIOS.has(normalizar(valor).toUpperCase())
-    ? SIN_DATO
-    : normalizar(valor)
-
-/** El año puede venir como número, como fecha o como marcador. */
-function limpiarAnio(valor) {
-  const texto = limpiar(valor)
-  if (texto === SIN_DATO) return SIN_DATO
-
-  const anio = /(19|20)\d{2}/.exec(texto)
-  return anio ? Number(anio[0]) : texto
-}
+/** Decodifica la letra de columna ('B' -> 1) usando la utilidad de SheetJS. */
+const decodificarColumna = (letra) => xlsx.utils.decode_col(letra)
 
 /**
  * Lee el membrete del formato (código, fecha y versión).
@@ -200,8 +78,8 @@ function leerMetadataFormato(hoja) {
 function construirId(placa, nombreHoja, usados) {
   const base =
     placa !== SIN_DATO
-      ? clave(placa).replace(/[^A-Z0-9]/g, '')
-      : clave(nombreHoja)
+      ? normalizarClave(placa).replace(/[^A-Z0-9]/g, '')
+      : normalizarClave(nombreHoja)
           .replace(/[^A-Z0-9]/g, '-')
           .replace(/-+/g, '-')
           .replace(/^-|-$/g, '')
@@ -235,13 +113,11 @@ for (const nombreHoja of libro.SheetNames) {
     continue
   }
 
-  const indice = indexarRotulos(hoja)
-  const registro = { hoja: nombreHoja }
+  const { registro: campos, faltantes } = extraerFicha(hoja, decodificarColumna)
+  const registro = { hoja: nombreHoja, ...campos }
 
-  for (const [campo, rotulo] of Object.entries(MAPA_CAMPOS)) {
-    const crudo = leerCampo(hoja, indice, rotulo)
-    if (crudo === null) incidencias.push(nombreHoja + ': falta el rótulo "' + rotulo + '"')
-    registro[campo] = campo === 'anioAdquisicion' ? limpiarAnio(crudo) : limpiar(crudo)
+  for (const rotulo of faltantes) {
+    incidencias.push(nombreHoja + ': falta el rótulo "' + rotulo + '"')
   }
 
   // La hoja es la fuente más confiable del nombre cuando la celda viene vacía.
@@ -264,7 +140,9 @@ const nombrePorHoja = new Map(maquinas.map((m) => [m.hoja, m.id]))
 // Nivel superior de un módulo ES: se puede usar await directamente.
 const { imagenPorHoja, informe } = await extraerImagenes(libro, nombrePorHoja, {
   carpetaMaquinas: CARPETA_MAQUINAS,
-  archivoLogo: ARCHIVO_LOGO,
+  // La aplicación ya no muestra ningún logo corporativo: se sigue detectando
+  // para no confundirlo con una fotografía, pero no se escribe a public/.
+  archivoLogo: null,
   escribir: !esDiagnostico,
 })
 

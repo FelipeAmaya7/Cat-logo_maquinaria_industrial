@@ -1,4 +1,4 @@
-# Empaques & Cartones — Catálogo técnico de maquinaria industrial
+# Sistema de Gestión y Fichas Técnicas — Control y registro de maquinaria y equipos
 
 Aplicación web **estática** (sin backend ni base de datos) que consulta el inventario
 de maquinaria de planta y muestra la ficha técnica formal de cada activo.
@@ -64,8 +64,10 @@ relaciones del paquete (`workbook → sheet → drawing → media`) para saber q
 pertenece a qué hoja, y escribe:
 
 - `public/maquinas/<ID>.webp` — una por máquina, nombrada con su placa.
-- `public/logo-empaques-cartones.png` — el logo oficial, que está incrustado en
-  las 50 hojas y se identifica por esa frecuencia.
+
+El logo corporativo está incrustado en las 50 hojas y se identifica por esa
+frecuencia, pero **no se escribe a disco**: la interfaz usa un ícono genérico, y
+detectarlo solo sirve para no confundirlo con la fotografía de una máquina.
 
 El tipo de archivo se deduce de los bytes mágicos, porque Excel guarda varias
 fotos como `.tmp` y añade copias `.wdp` (JPEG XR) que ningún navegador muestra.
