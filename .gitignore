@@ -22,3 +22,22 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Libros de Excel: son la FUENTE de src/data/maquinas.js, no un artefacto del
+# despliegue. Pesan decenas de MB y contienen el inventario completo de planta,
+# así que se mantienen locales y solo se publica lo que genera `npm run datos`.
+*.xlsx
+*.xlsm
+*.xls
+*.xlsb
+*.xltx
+~$*.xls*
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+
+# Artefactos de despliegue
+.cache/
+node_modules/.vite/
