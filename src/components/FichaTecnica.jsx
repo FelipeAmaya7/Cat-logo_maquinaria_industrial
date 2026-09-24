@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { resolverFotografia } from "../data/fotografias";
-import {
-  INSTITUCION,
-  RUTA_LOGO,
-  formatearFechaFormato,
-} from "../data/institucion";
+import { INSTITUCION, formatearFechaFormato } from "../data/institucion";
+import { descargarFichaExcel } from "../servicios/exportarExcel";
+import { DistintivoSistema } from "./IconoSistema";
 
 /** Marcador que usa el extractor cuando el formato venía sin diligenciar. */
 const SIN_DATO = "No registrado";
@@ -226,8 +224,25 @@ function FichaTecnica({ maquina, onInicio, onGuardar }) {
   const [errores, setErrores] = useState({});
   const [error, setError] = useState("");
   const [guardado, setGuardado] = useState(false);
+  const [descargando, setDescargando] = useState(false);
 
   const editando = borrador !== null;
+
+  /**
+   * Exporta la ficha a un .xlsx real.
+   *
+   * Exporta `maquina`, que es lo GUARDADO, no el borrador: así lo que el archivo
+   * contiene coincide siempre con lo que muestra la ficha. Por eso el botón solo
+   * aparece en modo lectura, donde ambas cosas son la misma.
+   */
+  const descargar = async () => {
+    setDescargando(true);
+    const resultado = await descargarFichaExcel(maquina);
+    setDescargando(false);
+
+    if (!resultado.ok) setError(resultado.error);
+    else setError("");
+  };
 
   /** Entra en edición copiando los valores actuales al borrador. */
   const empezarEdicion = () => {
@@ -305,15 +320,11 @@ function FichaTecnica({ maquina, onInicio, onGuardar }) {
     >
       <form onSubmit={guardar} noValidate>
         <article className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm">
-          {/* Membrete: logo a la izquierda, acciones y metadata a la derecha */}
+          {/* Membrete: distintivo a la izquierda, acciones y metadata a la derecha */}
           <header className="flex flex-col gap-4 border-b border-gray-300 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-center gap-4">
-              <img
-                src={RUTA_LOGO}
-                alt={`Logo de ${INSTITUCION.nombre}`}
-                className="h-11 w-auto shrink-0"
-              />
-              <div className="border-l border-gray-300 pl-4">
+              <DistintivoSistema className="h-11 w-11" claseIcono="h-6 w-6" />
+              <div className="min-w-0 border-l border-gray-300 pl-4">
                 <h2 className="text-base font-bold uppercase tracking-wide text-gray-800">
                   Ficha técnica de maquinaria
                 </h2>
@@ -354,6 +365,15 @@ function FichaTecnica({ maquina, onInicio, onGuardar }) {
                   </>
                 ) : (
                   <>
+                    <button
+                      key="descargar"
+                      type="button"
+                      onClick={descargar}
+                      disabled={descargando}
+                      className="rounded-md border border-emerald-600 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400"
+                    >
+                      {descargando ? "Generando…" : "Descargar en Excel (.xlsx)"}
+                    </button>
                     <button
                       key="editar"
                       type="button"

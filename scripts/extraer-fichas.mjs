@@ -37,7 +37,6 @@ const raizProyecto = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ARCHIVO_EXCEL = resolve(raizProyecto, 'FICHAS TECNICAS MAQUINAS.xlsm')
 const ARCHIVO_SALIDA = resolve(raizProyecto, 'src/data/maquinas.js')
 const CARPETA_MAQUINAS = resolve(raizProyecto, 'public/maquinas')
-const ARCHIVO_LOGO = resolve(raizProyecto, 'public/logo-empaques-cartones')
 
 /** Hojas que no son fichas técnicas. */
 const HOJAS_OMITIDAS = new Set(['INDICE', 'Fisico'])
@@ -141,7 +140,9 @@ const nombrePorHoja = new Map(maquinas.map((m) => [m.hoja, m.id]))
 // Nivel superior de un módulo ES: se puede usar await directamente.
 const { imagenPorHoja, informe } = await extraerImagenes(libro, nombrePorHoja, {
   carpetaMaquinas: CARPETA_MAQUINAS,
-  archivoLogo: ARCHIVO_LOGO,
+  // La aplicación ya no muestra ningún logo corporativo: se sigue detectando
+  // para no confundirlo con una fotografía, pero no se escribe a public/.
+  archivoLogo: null,
   escribir: !esDiagnostico,
 })
 

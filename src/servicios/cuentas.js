@@ -223,20 +223,6 @@ export function leerEdiciones(usuario) {
 }
 
 /**
- * Guarda el parche de una ficha y devuelve el mapa completo de ediciones ya
- * actualizado, para que la interfaz refresque sin releer el almacenamiento.
- *
- * INVARIANTE: `cambios` es el parche COMPLETO de la máquina respecto al
- * catálogo generado, no un incremento sobre el parche guardado. Aquí se
- * reemplaza, no se mezcla: quien llame con una diferencia parcial borrará las
- * ediciones anteriores de esa ficha.
- *
- * @param {string} usuario
- * @param {string} idMaquina
- * @param {Object} cambios Todos los campos que difieren del original.
- * @returns {{ok: boolean, ediciones: Object}}
- */
-/**
  * Fichas que el usuario ha cargado él mismo desde un archivo de Excel.
  *
  * Se guardan COMPLETAS —no como identificadores— porque no existen en el
@@ -250,21 +236,26 @@ export function maquinasPropias(usuario) {
 }
 
 /**
- * Añade una ficha cargada por el usuario a su catálogo.
+ * Guarda una ficha cargada por el usuario: la AÑADE o la REEMPLAZA.
+ *
+ * Reemplazar en vez de rechazar es lo que hace posible el ciclo completo con
+ * Excel: descargar una ficha, corregirla en la hoja y volver a subirla actualiza
+ * la que ya estaba, en lugar de dejar dos versiones compitiendo en el catálogo.
  *
  * @param {string} usuario
  * @param {Object} maquina
- * @returns {{ok: boolean, error?: string, maquinas?: Object[]}}
+ * @returns {{ok: boolean, error?: string, maquinas?: Object[], actualizada?: boolean}}
  */
-export function agregarMaquinaPropia(usuario, maquina) {
+export function guardarMaquinaPropia(usuario, maquina) {
   const clave = `${CLAVE_PROPIAS}:${normalizar(usuario)}`
   const propias = leer(clave, [])
 
-  if (propias.some((existente) => existente.id === maquina.id)) {
-    return { ok: false, error: 'Ya existe una ficha con esa placa en tu catálogo.' }
-  }
+  const posicion = propias.findIndex((existente) => existente.id === maquina.id)
+  const actualizada = posicion !== -1
 
-  const siguientes = [...propias, maquina]
+  const siguientes = actualizada
+    ? propias.map((existente, indice) => (indice === posicion ? maquina : existente))
+    : [...propias, maquina]
 
   if (!escribir(clave, siguientes)) {
     // La causa habitual es la cuota de localStorage, que ronda los 5 MB.
@@ -274,9 +265,23 @@ export function agregarMaquinaPropia(usuario, maquina) {
     }
   }
 
-  return { ok: true, maquinas: siguientes }
+  return { ok: true, maquinas: siguientes, actualizada }
 }
 
+/**
+ * Guarda el parche de una ficha y devuelve el mapa completo de ediciones ya
+ * actualizado, para que la interfaz refresque sin releer el almacenamiento.
+ *
+ * INVARIANTE: `cambios` es el parche COMPLETO de la máquina respecto al
+ * catálogo generado, no un incremento sobre el parche guardado. Aquí se
+ * reemplaza, no se mezcla: quien llame con una diferencia parcial borrará las
+ * ediciones anteriores de esa ficha.
+ *
+ * @param {string} usuario
+ * @param {string} idMaquina
+ * @param {Object} cambios Todos los campos que difieren del original.
+ * @returns {{ok: boolean, ediciones: Object}}
+ */
 export function guardarEdicion(usuario, idMaquina, cambios) {
   const clave = `${CLAVE_EDICIONES}:${normalizar(usuario)}`
   const ediciones = leer(clave, {})

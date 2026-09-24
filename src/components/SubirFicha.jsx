@@ -26,9 +26,10 @@ const CAMPOS_RESUMEN = [
  * @param {Object} props
  * @param {(maquina: Object) => {ok: boolean, error?: string}} props.onConfirmar
  * @param {() => void} props.onCerrar
- * @param {Set<string>} props.idsUsados  Identificadores ya presentes en el catálogo.
+ * @param {Set<string>} props.idsCatalogo Identificadores ya presentes en el catálogo,
+ *        para anunciar si la ficha se va a añadir o a actualizar.
  */
-function SubirFicha({ onConfirmar, onCerrar, idsUsados }) {
+function SubirFicha({ onConfirmar, onCerrar, idsCatalogo }) {
   const [maquina, setMaquina] = useState(null)
   const [faltantes, setFaltantes] = useState([])
   const [nombreExcel, setNombreExcel] = useState('')
@@ -62,7 +63,7 @@ function SubirFicha({ onConfirmar, onCerrar, idsUsados }) {
     setError('')
     setProcesando(true)
 
-    const resultado = await leerFichaDesdeExcel(archivo, { idsUsados })
+    const resultado = await leerFichaDesdeExcel(archivo)
 
     setProcesando(false)
 
@@ -104,6 +105,9 @@ function SubirFicha({ onConfirmar, onCerrar, idsUsados }) {
     else if (TIPOS_IMAGEN.includes(archivo.type)) procesarFoto(archivo)
     else setError(`Suelte un archivo ${EXTENSIONES_EXCEL.join(' / ')} o una imagen.`)
   }
+
+  // La ficha ya está en el catálogo: subirla de nuevo la actualiza, no la duplica.
+  const yaExiste = Boolean(maquina && idsCatalogo?.has(maquina.id))
 
   const confirmar = () => {
     const resultado = onConfirmar({ ...maquina, imagen: fotografia })
@@ -274,6 +278,14 @@ function SubirFicha({ onConfirmar, onCerrar, idsUsados }) {
                 </div>
               </div>
 
+              {yaExiste && (
+                <p className="border-t border-gray-200 bg-blue-50 px-4 py-2 text-[11px] leading-snug text-blue-800">
+                  Ya existe una ficha con la placa <strong>{maquina.placaNueva}</strong> (
+                  <span className="font-mono">{maquina.id}</span>). Al confirmar se
+                  ACTUALIZARÁ con los datos de este archivo; no se creará una copia.
+                </p>
+              )}
+
               {faltantes.length > 0 && (
                 <p className="border-t border-gray-200 px-4 py-2 text-[11px] leading-snug text-amber-700">
                   {faltantes.length} rótulo(s) no aparecían en la hoja; esos campos quedaron como
@@ -298,7 +310,7 @@ function SubirFicha({ onConfirmar, onCerrar, idsUsados }) {
             disabled={!maquina}
             className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-emerald-300"
           >
-            Añadir al catálogo
+            {yaExiste ? 'Actualizar ficha existente' : 'Añadir al catálogo'}
           </button>
         </footer>
       </div>

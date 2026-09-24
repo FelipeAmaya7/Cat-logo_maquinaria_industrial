@@ -7,16 +7,22 @@ import Autenticacion from './components/Autenticacion'
 import SubirFicha from './components/SubirFicha'
 import { filtrarMaquinas } from './data/maquinas'
 import { obtenerMaquinasPorId } from './data/catalogo'
+import { INSTITUCION } from './data/institucion'
+import { MAPA_CAMPOS } from './servicios/anclajeRotulos'
+import { descargarCatalogoExcel } from './servicios/exportarExcel'
 import {
-  agregarMaquinaPropia,
   cerrarSesion,
   guardarEdicion,
+  guardarMaquinaPropia,
   leerEdiciones,
   leerSesion,
   maquinasDeUsuario,
   maquinasPropias,
   sembrarDatosIniciales,
 } from './servicios/cuentas'
+
+/** Campos que un archivo de Excel puede traer; los demás no se tocan al importar. */
+const CAMPOS_IMPORTABLES = Object.keys(MAPA_CAMPOS)
 
 /** Vistas disponibles una vez iniciada la sesión. */
 const VISTAS = {
@@ -48,7 +54,9 @@ function App() {
   const [ediciones, setEdiciones] = useState({})
   const [propias, setPropias] = useState([])
   const [subiendo, setSubiendo] = useState(false)
-  const [aviso, setAviso] = useState('')
+  const [exportando, setExportando] = useState(false)
+  // { texto, error }: un mismo recuadro sirve para confirmar y para avisar de un fallo.
+  const [aviso, setAviso] = useState({ texto: '', error: false })
 
   /**
    * Único punto donde cambia el usuario activo.
@@ -61,7 +69,7 @@ function App() {
     setSesion(nuevaSesion)
     setEdiciones(nuevaSesion ? leerEdiciones(nuevaSesion.usuario) : {})
     setPropias(nuevaSesion ? maquinasPropias(nuevaSesion.usuario) : [])
-    setAviso('')
+    setAviso({ texto: '', error: false })
   }
 
   // Al arrancar: precarga la cuenta inicial y recupera la sesión persistida.
@@ -155,17 +163,71 @@ function App() {
 
   /**
    * Incorpora al catálogo una ficha leída de un archivo de Excel.
+   *
+   * El identificador sale de la placa, así que subir de nuevo una ficha ya
+   * conocida ACTUALIZA la existente. Cómo se actualiza depende de su origen:
+   *
+   *   - Ficha del libro oficial: el archivo se guarda como EDICIÓN (un parche),
+   *     igual que si se hubiera escrito en el formulario. Así el dato de fábrica
+   *     sigue intacto y una futura reextracción del Excel no se pierde.
+   *   - Ficha cargada por la persona: no existe fuera de aquí, así que su copia
+   *     se reemplaza entera.
+   *
    * @returns {{ok: boolean, error?: string}}
    */
-  const agregarFicha = (maquina) => {
-    const resultado = agregarMaquinaPropia(sesion.usuario, maquina)
+  const importarFicha = (maquina) => {
+    const esPropia = propias.some((existente) => existente.id === maquina.id)
+    const enCatalogo = catalogoBase.some((existente) => existente.id === maquina.id)
+
+    const cerrar = (mensaje) => {
+      setSubiendo(false)
+      setTermino('')
+      setAviso({ texto: mensaje, error: false })
+      return { ok: true }
+    }
+
+    // Ficha del libro oficial: se traduce a un parche de edición.
+    if (enCatalogo && !esPropia) {
+      const valores = {}
+      for (const campo of CAMPOS_IMPORTABLES) {
+        valores[campo] = String(maquina[campo] ?? '')
+      }
+
+      if (!aplicarEdicion(maquina.id, valores)) {
+        return { ok: false, error: 'No se pudieron guardar los cambios en este navegador.' }
+      }
+
+      return cerrar(`Ficha «${maquina.descripcion}» actualizada desde el archivo.`)
+    }
+
+    // Una recarga sin fotografía no debe borrar la que ya tenía la ficha.
+    const previa = propias.find((existente) => existente.id === maquina.id)
+    const resultado = guardarMaquinaPropia(sesion.usuario, {
+      ...maquina,
+      imagen: maquina.imagen ?? previa?.imagen ?? null,
+    })
     if (!resultado.ok) return resultado
 
     setPropias(resultado.maquinas)
-    setSubiendo(false)
-    setTermino('')
-    setAviso(`Ficha «${maquina.descripcion}» añadida a tu catálogo.`)
-    return { ok: true }
+
+    return cerrar(
+      resultado.actualizada
+        ? `Ficha «${maquina.descripcion}» actualizada desde el archivo.`
+        : `Ficha «${maquina.descripcion}» añadida a tu catálogo.`,
+    )
+  }
+
+  /** Exporta a .xlsx el catálogo completo del usuario, con sus ediciones. */
+  const exportarCatalogo = async () => {
+    setExportando(true)
+    const resultado = await descargarCatalogoExcel(catalogoUsuario)
+    setExportando(false)
+
+    setAviso(
+      resultado.ok
+        ? { texto: `Catálogo descargado como «${resultado.archivo}».`, error: false }
+        : { texto: resultado.error, error: true },
+    )
   }
 
   /** Cierra la sesión y devuelve la aplicación a su estado inicial. */
@@ -220,21 +282,38 @@ function App() {
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => setSubiendo(true)}
-                className="shrink-0 rounded-md bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2"
-              >
-                + Subir ficha técnica
-              </button>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSubiendo(true)}
+                  className="rounded-md bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2"
+                >
+                  + Subir ficha (Excel)
+                </button>
+
+                {catalogoUsuario.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={exportarCatalogo}
+                    disabled={exportando}
+                    className="rounded-md border border-emerald-600 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400"
+                  >
+                    {exportando ? 'Generando…' : 'Descargar catálogo (.xlsx)'}
+                  </button>
+                )}
+              </div>
             </div>
 
-            {aviso && (
+            {aviso.texto && (
               <p
-                role="status"
-                className="mb-5 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
+                role={aviso.error ? 'alert' : 'status'}
+                className={`mb-5 rounded-md border px-4 py-3 text-sm ${
+                  aviso.error
+                    ? 'border-red-200 bg-red-50 text-red-700'
+                    : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                }`}
               >
-                {aviso}
+                {aviso.texto}
               </p>
             )}
             <ListaTarjetas
@@ -248,15 +327,15 @@ function App() {
 
       {subiendo && (
         <SubirFicha
-          onConfirmar={agregarFicha}
+          onConfirmar={importarFicha}
           onCerrar={() => setSubiendo(false)}
-          idsUsados={new Set(catalogoBase.map((maquina) => maquina.id))}
+          idsCatalogo={new Set(catalogoBase.map((maquina) => maquina.id))}
         />
       )}
 
       <footer className="border-t border-gray-300 bg-white">
         <div className="mx-auto max-w-6xl px-4 py-5 text-xs text-slate-500 sm:px-6">
-          Empaques &amp; Cartones · Catálogo técnico de maquinaria industrial
+          {INSTITUCION.titulo} · {INSTITUCION.subtitulo}
         </div>
       </footer>
     </div>

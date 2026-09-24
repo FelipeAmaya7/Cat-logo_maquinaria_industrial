@@ -10,7 +10,38 @@
  * cualquier fallo devuelve el valor por defecto en lugar de propagar el error.
  */
 
-const PREFIJO = 'empaques-cartones:'
+const PREFIJO = 'fichas-tecnicas:'
+
+/**
+ * Prefijo usado antes de retirar la marca corporativa.
+ *
+ * Renombrar a secas habría dejado inaccesibles las cuentas, sesiones, ediciones
+ * y fichas cargadas de quien ya venía usando la aplicación: para el navegador
+ * son claves distintas. Por eso las entradas viejas se copian una sola vez, al
+ * cargar el módulo, y se eliminan las originales.
+ */
+const PREFIJO_ANTERIOR = 'empaques-cartones:'
+
+function migrarClavesAnteriores() {
+  try {
+    const antiguas = Object.keys(window.localStorage).filter((clave) =>
+      clave.startsWith(PREFIJO_ANTERIOR),
+    )
+
+    for (const clave of antiguas) {
+      const nueva = PREFIJO + clave.slice(PREFIJO_ANTERIOR.length)
+      // Si ya se usó la aplicación con el nombre nuevo, ese dato es el vigente.
+      if (window.localStorage.getItem(nueva) === null) {
+        window.localStorage.setItem(nueva, window.localStorage.getItem(clave))
+      }
+      window.localStorage.removeItem(clave)
+    }
+  } catch {
+    // Almacenamiento bloqueado: no hay nada que migrar y nada que romper.
+  }
+}
+
+migrarClavesAnteriores()
 
 /**
  * Lee un valor y lo deserializa.

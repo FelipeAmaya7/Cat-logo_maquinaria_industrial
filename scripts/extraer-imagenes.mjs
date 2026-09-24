@@ -175,7 +175,7 @@ function mapearImagenesPorHoja(libro) {
  * @param {Map<string,string>} nombrePorHoja  Hoja -> nombre base del archivo (la placa).
  * @param {Object} opciones
  * @param {string} opciones.carpetaMaquinas   Destino de las fotografías.
- * @param {string} opciones.archivoLogo       Destino del logo institucional.
+ * @param {string|null} opciones.archivoLogo  Destino del logo, o null para no escribirlo.
  * @param {boolean} [opciones.escribir=true]  En false solo calcula el mapeo (modo diagnóstico).
  * @returns {{ imagenPorHoja: Map<string,string>, logo: string|null, informe: string[] }}
  */
@@ -205,16 +205,23 @@ export async function extraerImagenes(
   }
 
   // 1. Logo institucional
+  //
+  // Se sigue DETECTANDO siempre, porque identificar la imagen repetida en todas
+  // las hojas es lo que evita confundirla con la fotografía de una máquina. Pero
+  // solo se ESCRIBE si quien llama pide un destino: la aplicación ya no muestra
+  // ninguna marca corporativa, así que por defecto el archivo no se genera.
   let logo = null
   const rutaLogo = [...rutasLogo][0]
   if (rutaLogo) {
     const datos = contenido(libro, rutaLogo)
     const formato = datos && detectarFormato(datos)
-    if (formato?.web) {
+    if (formato?.web && archivoLogo) {
       const destino = `${archivoLogo}.${formato.ext}`
       if (escribir) writeFileSync(destino, datos)
       logo = destino
       informe.push(`Logo institucional: ${rutaLogo} -> ${destino.split(/[\\/]/).pop()}`)
+    } else {
+      informe.push(`Logo institucional detectado (${rutaLogo}) y excluido de las fotos.`)
     }
   } else {
     informe.push('Aviso: no se identificó un logo común a las hojas.')

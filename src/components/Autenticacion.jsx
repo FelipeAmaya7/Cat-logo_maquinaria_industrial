@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { INSTITUCION, RUTA_LOGO } from '../data/institucion'
+import { INSTITUCION } from '../data/institucion'
+import { DistintivoSistema } from './IconoSistema'
 import { autenticar, registrar, LONGITUD_MINIMA_CONTRASENA } from '../servicios/cuentas'
 import { estaDisponible } from '../servicios/almacenamiento'
 
@@ -67,15 +68,14 @@ function Autenticacion({ onAutenticar }) {
     <div className="flex min-h-screen flex-col items-center justify-center bg-gray-100 px-4 py-10">
       <main className="w-full max-w-sm px-4 sm:max-w-md sm:px-0">
         <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm">
-          {/* Membrete institucional */}
-          <div className="border-b-4 border-red-600 px-6 py-6 text-center">
-            <img
-              src={RUTA_LOGO}
-              alt={`Logo de ${INSTITUCION.nombre}`}
-              className="mx-auto h-12 w-auto"
-            />
-            <p className="mt-3 text-sm font-semibold text-gray-800">{INSTITUCION.subtitulo}</p>
-            <p className="text-xs text-gray-500">{INSTITUCION.dependencia}</p>
+          {/* Membrete del sistema: ícono genérico, sin marca corporativa */}
+          <div className="border-b-4 border-industrial-800 px-6 py-6 text-center">
+            <DistintivoSistema className="mx-auto h-12 w-12" claseIcono="h-6 w-6" />
+            <h1 className="mt-3 text-sm font-bold uppercase tracking-wide text-gray-800">
+              {INSTITUCION.titulo}
+            </h1>
+            <p className="text-xs text-gray-500">{INSTITUCION.subtitulo}</p>
+            <p className="mt-1 text-xs text-gray-500">{INSTITUCION.dependencia}</p>
           </div>
 
           {/* Selector de modo */}

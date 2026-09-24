@@ -47,33 +47,32 @@ export function esArchivoExcel(archivo) {
 }
 
 /**
- * Genera un identificador único a partir de la placa leída.
+ * Identificador DERIVADO de la placa, sin sufijos para evitar colisiones.
+ *
+ * Que dos lecturas de la misma placa den el mismo id es justo lo que permite
+ * reconocer una ficha ya existente y ACTUALIZARLA. Antes se añadía un sufijo
+ * (`EM00068-2`) cuando el id ya estaba en el catálogo; eso garantizaba unicidad,
+ * pero convertía cada reenvío de una ficha corregida en un duplicado.
+ *
+ * Sin placa no hay identidad estable, así que ahí sí se genera una irrepetible.
  *
  * @param {string} placa
- * @param {Set<string>} usados Identificadores ya presentes en el catálogo.
  */
-function construirId(placa, usados) {
-  const base =
-    placa && placa !== SIN_DATO
-      ? normalizarClave(placa).replace(/[^A-Z0-9]/g, '')
-      : 'FICHA-' + Date.now().toString(36).toUpperCase()
+function construirId(placa) {
+  if (!placa || placa === SIN_DATO) {
+    return 'FICHA-' + Date.now().toString(36).toUpperCase()
+  }
 
-  let id = base || 'SIN-PLACA'
-  let sufijo = 2
-  while (usados.has(id)) id = `${base}-${sufijo++}`
-
-  return id
+  return normalizarClave(placa).replace(/[^A-Z0-9]/g, '') || 'SIN-PLACA'
 }
 
 /**
  * Extrae una ficha técnica de la PRIMERA hoja de un archivo de Excel.
  *
  * @param {File} archivo
- * @param {Object} opciones
- * @param {Set<string>} [opciones.idsUsados] Para no repetir identificadores.
  * @returns {Promise<{ok: boolean, error?: string, maquina?: Object, faltantes?: string[]}>}
  */
-export async function leerFichaDesdeExcel(archivo, { idsUsados = new Set() } = {}) {
+export async function leerFichaDesdeExcel(archivo) {
   if (!esArchivoExcel(archivo)) {
     return { ok: false, error: `Formato no admitido. Use ${EXTENSIONES_EXCEL.join(', ')}.` }
   }
@@ -116,7 +115,7 @@ export async function leerFichaDesdeExcel(archivo, { idsUsados = new Set() } = {
 
   const maquina = {
     ...registro,
-    id: construirId(registro.placaNueva, idsUsados),
+    id: construirId(registro.placaNueva),
     hoja: nombreHoja,
     imagen: null,
     // Sin membrete propio: la ficha se marca como cargada por el usuario.
