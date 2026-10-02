@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "datos": "node scripts/extraer-fichas.mjs",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist --dotfiles"
+    "deploy": "gh-pages -d dist --dotfiles",
+    "html": "node scripts/generar-html.mjs",
+    "html:catalogo": "node scripts/generar-html.mjs --catalogo"
   },
   "dependencies": {
     "react": "^19.2.8",

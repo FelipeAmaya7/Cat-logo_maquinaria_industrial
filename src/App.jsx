@@ -220,7 +220,7 @@ function App() {
   /** Exporta a .xlsx el catálogo completo del usuario, con sus ediciones. */
   const exportarCatalogo = async () => {
     setExportando(true)
-    const resultado = await descargarCatalogoExcel(catalogoUsuario)
+    const resultado = await descargarCatalogoExcel(catalogoUsuario, { usuario: sesion.usuario })
     setExportando(false)
 
     setAviso(
