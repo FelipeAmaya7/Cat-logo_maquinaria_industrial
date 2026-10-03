@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { resolverFotografia } from "../data/fotografias";
 import { INSTITUCION, formatearFechaFormato } from "../data/institucion";
+import { GRUPOS_RESUELTOS } from "../data/gruposFicha";
 import { descargarFichaExcel } from "../servicios/exportarExcel";
 import { descargarFichaHtml } from "../servicios/exportarHtml";
+import { TIPOS_IMAGEN, prepararFotografia } from "../servicios/imagen";
 import { DistintivoSistema } from "./IconoSistema";
 
 /** Marcador que usa el extractor cuando el formato venía sin diligenciar. */
@@ -22,31 +24,17 @@ const ANIO_MINIMO = 1900;
  * `tipo` describe el dato esperado; `requerido` marca lo que identifica la
  * ficha y no puede quedar en blanco.
  */
-const CAMPOS = [
-  { campo: "placaNueva", etiqueta: "Placa nueva", requerido: true },
-  { campo: "descripcion", etiqueta: "Descripción", requerido: true },
-  { campo: "marca", etiqueta: "Marca" },
-  { campo: "modelo", etiqueta: "Modelo" },
-  { campo: "serie", etiqueta: "Serie" },
-  { campo: "anioAdquisicion", etiqueta: "Año de adquisición", tipo: "anio" },
-  { campo: "estado", etiqueta: "Estado" },
-  { campo: "disponibilidad", etiqueta: "Disponibilidad" },
-  { campo: "ubicacion", etiqueta: "Ubicación" },
-  { campo: "piso", etiqueta: "Piso" },
-  { campo: "turnoPorDia", etiqueta: "Turno por día" },
-  { campo: "capacidad", etiqueta: "Capacidad productiva" },
-  { campo: "material", etiqueta: "Material" },
-  { campo: "color", etiqueta: "Color" },
-  { campo: "dimension", etiqueta: "Dimensión" },
-  { campo: "vidaUtil", etiqueta: "Vida útil en años", tipo: "entero" },
-];
+/**
+ * Campos de la ficha, derivados de las secciones compartidas.
+ *
+ * Antes eran dos listas fijas aquí dentro, y cada campo nuevo del modelo se
+ * quedaba invisible hasta que alguien se acordaba de añadirlo. Ahora la única
+ * fuente es `gruposFicha.js`, que comparte con el formulario de creación.
+ */
+const CAMPOS = GRUPOS_RESUELTOS.flatMap((grupo) => grupo.campos).filter((c) => !c.extenso)
 
 /** Campos de texto extenso, que se editan con textarea. */
-const BLOQUES = [
-  { campo: "funcion", etiqueta: "Función que presta" },
-  { campo: "materialProcesado", etiqueta: "Material procesado" },
-  { campo: "especificaciones", etiqueta: "Especificaciones" },
-];
+const BLOQUES = GRUPOS_RESUELTOS.flatMap((grupo) => grupo.campos).filter((c) => c.extenso)
 
 /** Todo lo que el formulario controla, en el orden en que se recorre al validar. */
 const EDITABLES = [...CAMPOS, ...BLOQUES];
@@ -106,9 +94,24 @@ function validarBorrador(borrador) {
 }
 
 /** Contenedor de la fotografía técnica, con respaldo si el archivo no existe. */
-function FotoTecnica({ maquina }) {
+function FotoTecnica({ maquina, editando, imagen, onCambiarImagen, onError }) {
   const [falloImagen, setFalloImagen] = useState(false);
-  const src = resolverFotografia(maquina.imagen);
+  // En edicion manda el borrador; en lectura, la ficha guardada.
+  const src = resolverFotografia(editando ? imagen : maquina.imagen);
+  const entrada = useRef(null);
+
+  const elegir = async (archivo) => {
+    if (!archivo) return;
+
+    const resultado = await prepararFotografia(archivo);
+    if (!resultado.ok) {
+      onError(resultado.error);
+      return;
+    }
+
+    setFalloImagen(false);
+    onCambiarImagen(resultado.imagen);
+  };
 
   return (
     <figure className="flex h-full flex-col">
@@ -145,7 +148,37 @@ function FotoTecnica({ maquina }) {
         )}
       </div>
 
-      {maquina.imagenEsRespaldo && (
+      {editando && (
+        <div className="flex flex-wrap items-center gap-2 pt-2">
+          <button
+            type="button"
+            onClick={() => entrada.current?.click()}
+            className="rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300"
+          >
+            {src ? "Cambiar fotografía" : "Añadir fotografía"}
+          </button>
+
+          {src && (
+            <button
+              type="button"
+              onClick={() => onCambiarImagen(null)}
+              className="rounded border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300"
+            >
+              Quitar
+            </button>
+          )}
+
+          <input
+            ref={entrada}
+            type="file"
+            accept={TIPOS_IMAGEN.join(",")}
+            className="hidden"
+            onChange={(evento) => elegir(evento.target.files?.[0])}
+          />
+        </div>
+      )}
+
+      {maquina.imagenEsRespaldo && !editando && (
         <p className="pt-2 text-[11px] leading-snug text-amber-700">
           Imagen de referencia: esta ficha no tiene fotografía propia en el
           formato original.
@@ -218,9 +251,11 @@ function ErrorCampo({ campo, mensaje }) {
  * @param {import('../data/maquinas').Maquina} props.maquina  Activo a documentar.
  * @param {() => void} props.onInicio                          Regresa a la vista de catálogo.
  * @param {(idMaquina: string, valores: Object<string, string>) => boolean} props.onGuardar
+ * @param {(maquina: Object) => void} props.onEliminar  Quita la ficha del catálogo.
  *        Persiste los valores editables. Devuelve false si no se pudo guardar.
  */
-function FichaTecnica({ maquina, onInicio, onGuardar }) {
+function FichaTecnica({ maquina, onInicio, onGuardar, onEliminar }) {
+  const [confirmandoBorrado, setConfirmandoBorrado] = useState(false);
   const [borrador, setBorrador] = useState(null);
   const [errores, setErrores] = useState({});
   const [error, setError] = useState("");
@@ -395,6 +430,14 @@ function FichaTecnica({ maquina, onInicio, onGuardar }) {
                       Descargar en HTML
                     </button>
                     <button
+                      key="eliminar"
+                      type="button"
+                      onClick={() => setConfirmandoBorrado(true)}
+                      className="rounded-md border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 shadow-sm transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300 focus:ring-offset-2"
+                    >
+                      Eliminar
+                    </button>
+                    <button
                       key="editar"
                       type="button"
                       onClick={empezarEdicion}
@@ -425,6 +468,31 @@ function FichaTecnica({ maquina, onInicio, onGuardar }) {
             >
               {error}
             </p>
+          )}
+
+          {confirmandoBorrado && !editando && (
+            <div className="flex flex-col gap-3 border-b border-red-200 bg-red-50 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-red-800">
+                ¿Eliminar la ficha <b>{maquina.placaNueva}</b> de tu catálogo? Esta acción no se
+                puede deshacer.
+              </p>
+              <div className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmandoBorrado(false)}
+                  className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onEliminar(maquina)}
+                  className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
+                >
+                  Sí, eliminar
+                </button>
+              </div>
+            </div>
           )}
 
           {editando && (
@@ -465,7 +533,7 @@ function FichaTecnica({ maquina, onInicio, onGuardar }) {
                   Datos de identificación y operación del equipo
                 </caption>
                 <tbody>
-                  {CAMPOS.map(({ campo, etiqueta, tipo }) => (
+                  {CAMPOS.map(({ campo, rotulo, tipo }) => (
                     <tr key={campo} className="border-b border-gray-300">
                       <th
                         scope="row"
@@ -474,7 +542,7 @@ function FichaTecnica({ maquina, onInicio, onGuardar }) {
                         <label
                           htmlFor={editando ? `campo-${campo}` : undefined}
                         >
-                          {etiqueta}
+                          {rotulo}
                         </label>
                       </th>
                       <td className="py-2 align-top text-sm text-gray-700">
@@ -510,16 +578,22 @@ function FichaTecnica({ maquina, onInicio, onGuardar }) {
             </div>
 
             {/* Contenedor de la foto técnica */}
-            <FotoTecnica maquina={maquina} />
+            <FotoTecnica
+              maquina={maquina}
+              editando={editando}
+              imagen={editando ? borrador.imagen : null}
+              onCambiarImagen={(dato) => actualizar("imagen", dato)}
+              onError={setError}
+            />
           </div>
 
           {/* Campos de texto extenso */}
           <div className="grid grid-cols-1 gap-5 border-t border-gray-300 px-5 py-5 sm:grid-cols-3">
-            {BLOQUES.map(({ campo, etiqueta }) => (
+            {BLOQUES.map(({ campo, rotulo }) => (
               <div key={campo}>
                 <h4 className="border-b border-gray-300 pb-2 text-[11px] font-bold uppercase tracking-wide text-gray-800">
                   <label htmlFor={editando ? `campo-${campo}` : undefined}>
-                    {etiqueta}
+                    {rotulo}
                   </label>
                 </h4>
                 {editando ? (

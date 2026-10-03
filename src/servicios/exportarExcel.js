@@ -24,6 +24,7 @@
  */
 import { MAPA_CAMPOS, SIN_DATO } from './anclajeRotulos'
 import { FICHA_TECNICA, ORDENES_DE_TRABAJO, REGISTRO_DE_DATOS } from './formatoCompanero'
+import { COLUMNAS_ORDEN } from '../data/ordenes'
 
 /**
  * Carga `xlsx` BAJO DEMANDA, igual que el lector.
@@ -160,9 +161,10 @@ function hojaTabular(xlsx, { columnas }, maquinas) {
  * @param {Object[]} maquinas Catálogo ya con las ediciones aplicadas.
  * @param {Object} [opciones]
  * @param {string} [opciones.usuario] Queda registrado en la hoja de resumen.
+ * @param {Object[]} [opciones.ordenes] Órdenes de trabajo del usuario.
  * @returns {Promise<{ok: boolean, error?: string, archivo?: string}>}
  */
-export async function descargarCatalogoExcel(maquinas, { usuario } = {}) {
+export async function descargarCatalogoExcel(maquinas, { usuario, ordenes = [] } = {}) {
   if (!maquinas || maquinas.length === 0) {
     return { ok: false, error: 'No hay fichas que exportar.' }
   }
@@ -177,11 +179,22 @@ export async function descargarCatalogoExcel(maquinas, { usuario } = {}) {
       REGISTRO_DE_DATOS.hoja,
     )
 
-    // Sin datos de órdenes de trabajo: se entrega la plantilla con sus títulos.
-    const hojaOrdenes = xlsx.utils.aoa_to_sheet([ORDENES_DE_TRABAJO.columnas])
+    // Las órdenes registradas. Sin ninguna, queda la plantilla con sus títulos.
+    const filasOrdenes = ordenes.map((orden) =>
+      COLUMNAS_ORDEN.map(([campo]) => {
+        if (campo !== 'equipo') return String(orden[campo] ?? '')
+
+        // En el Excel se escribe la placa, no el identificador interno.
+        const maquina = maquinas.find((m) => m.id === orden.equipo)
+        return maquina ? maquina.placaNueva : String(orden.equipo ?? '')
+      }),
+    )
+
+    const hojaOrdenes = xlsx.utils.aoa_to_sheet([ORDENES_DE_TRABAJO.columnas, ...filasOrdenes])
     hojaOrdenes['!cols'] = ORDENES_DE_TRABAJO.columnas.map((rotulo) => ({
       wch: Math.max(ANCHO_MINIMO, rotulo.length + 2),
     }))
+    hojaOrdenes['!freeze'] = { xSplit: 0, ySplit: 1 }
     xlsx.utils.book_append_sheet(libro, hojaOrdenes, ORDENES_DE_TRABAJO.hoja)
 
     xlsx.utils.book_append_sheet(
@@ -190,7 +203,7 @@ export async function descargarCatalogoExcel(maquinas, { usuario } = {}) {
       FICHA_TECNICA.hoja,
     )
 
-    xlsx.utils.book_append_sheet(libro, hojaResumen(xlsx, maquinas, usuario), 'Resumen')
+    xlsx.utils.book_append_sheet(libro, hojaResumen(xlsx, maquinas, usuario, ordenes), 'Resumen')
 
     const archivo = `catalogo-maquinaria-${sello()}.xlsx`
     xlsx.writeFile(libro, archivo)
@@ -202,7 +215,7 @@ export async function descargarCatalogoExcel(maquinas, { usuario } = {}) {
 }
 
 /** Hoja de portada con los conteos por estado y por ubicación. */
-function hojaResumen(xlsx, maquinas, usuario) {
+function hojaResumen(xlsx, maquinas, usuario, ordenes = []) {
   const contar = (campo) => {
     const conteo = new Map()
     for (const maquina of maquinas) {
@@ -219,6 +232,7 @@ function hojaResumen(xlsx, maquinas, usuario) {
     ['Usuario', usuario ?? ''],
     ['Total de fichas', maquinas.length],
     ['Con fotografía', maquinas.filter((maquina) => maquina.imagen).length],
+    ['Órdenes de trabajo', ordenes.length],
     [],
     ['Por estado', 'Fichas'],
     ...contar('estado'),
