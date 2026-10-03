@@ -2,6 +2,7 @@ import { useState } from "react";
 import { resolverFotografia } from "../data/fotografias";
 import { INSTITUCION, formatearFechaFormato } from "../data/institucion";
 import { descargarFichaExcel } from "../servicios/exportarExcel";
+import { descargarFichaHtml } from "../servicios/exportarHtml";
 import { DistintivoSistema } from "./IconoSistema";
 
 /** Marcador que usa el extractor cuando el formato venía sin diligenciar. */
@@ -244,6 +245,17 @@ function FichaTecnica({ maquina, onInicio, onGuardar }) {
     else setError("");
   };
 
+  /**
+   * Descarga la ficha como documento HTML con el formato de planta.
+   *
+   * Sincrónica, a diferencia de la de Excel: solo arma el documento, sin cargar
+   * ninguna librería. Por eso no necesita estado de "Generando…".
+   */
+  const descargarHtml = () => {
+    const resultado = descargarFichaHtml(maquina);
+    setError(resultado.ok ? "" : resultado.error);
+  };
+
   /** Entra en edición copiando los valores actuales al borrador. */
   const empezarEdicion = () => {
     const inicial = {};
@@ -373,6 +385,14 @@ function FichaTecnica({ maquina, onInicio, onGuardar }) {
                       className="rounded-md border border-emerald-600 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400"
                     >
                       {descargando ? "Generando…" : "Descargar en Excel (.xlsx)"}
+                    </button>
+                    <button
+                      key="descargar-html"
+                      type="button"
+                      onClick={descargarHtml}
+                      className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
+                    >
+                      Descargar en HTML
                     </button>
                     <button
                       key="editar"

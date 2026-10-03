@@ -23,6 +23,7 @@
  * los valores y no a su izquierda.
  */
 import { MAPA_CAMPOS, SIN_DATO } from './anclajeRotulos'
+import { FICHA_TECNICA, ORDENES_DE_TRABAJO, REGISTRO_DE_DATOS } from './formatoCompanero'
 
 /**
  * Carga `xlsx` BAJO DEMANDA, igual que el lector.
@@ -121,11 +122,40 @@ export async function descargarFichaExcel(maquina) {
   }
 }
 
+/** Construye una hoja a partir de una definición de columnas del formato. */
+function hojaTabular(xlsx, { columnas }, maquinas) {
+  const encabezado = columnas.map(([, rotulo]) => rotulo)
+
+  const cuerpo = maquinas.map((maquina) =>
+    // Una columna sin campo asociado existe en el formato pero no en estos
+    // datos (precio, responsable, intervenciones): se deja en blanco.
+    columnas.map(([campo]) => (campo ? valorTabla(maquina, campo) : '')),
+  )
+
+  const hoja = xlsx.utils.aoa_to_sheet([encabezado, ...cuerpo])
+
+  hoja['!cols'] = columnas.map(([campo, rotulo]) => ({
+    wch: ANCHOS_ESPECIALES[campo] ?? Math.max(ANCHO_MINIMO, rotulo.length + 2),
+  }))
+
+  // Títulos fijos y filtros puestos: lo primero que hace cualquiera al abrir.
+  hoja['!freeze'] = { xSplit: 0, ySplit: 1 }
+  hoja['!autofilter'] = {
+    ref: xlsx.utils.encode_range({
+      s: { r: 0, c: 0 },
+      e: { r: cuerpo.length, c: encabezado.length - 1 },
+    }),
+  }
+
+  return hoja
+}
+
 /**
- * Descarga el catálogo completo del usuario como tabla .xlsx.
+ * Descarga el catálogo completo del usuario como libro .xlsx.
  *
- * Añade una hoja «Resumen» con los conteos del inventario, que es lo que se
- * suele pedir primero al revisar un parque de máquinas.
+ * Reproduce la disposición de tres hojas del proyecto de referencia
+ * (ver `formatoCompanero.js`), más una hoja de resumen con los conteos del
+ * inventario.
  *
  * @param {Object[]} maquinas Catálogo ya con las ediciones aplicadas.
  * @param {Object} [opciones]
@@ -139,34 +169,27 @@ export async function descargarCatalogoExcel(maquinas, { usuario } = {}) {
 
   try {
     const xlsx = await cargarXlsx()
-
-    const encabezado = ['ID', ...CAMPOS.map(([, rotulo]) => rotulo)]
-    const cuerpo = maquinas.map((maquina) => [
-      maquina.id,
-      ...CAMPOS.map(([campo]) => valorTabla(maquina, campo)),
-    ])
-
-    const hoja = xlsx.utils.aoa_to_sheet([encabezado, ...cuerpo])
-
-    hoja['!cols'] = [
-      { wch: ANCHO_MINIMO },
-      ...CAMPOS.map(([campo, rotulo]) => ({
-        wch: ANCHOS_ESPECIALES[campo] ?? Math.max(ANCHO_MINIMO, rotulo.length + 2),
-      })),
-    ]
-
-    // Deja fija la fila de títulos al desplazarse por el inventario.
-    hoja['!freeze'] = { xSplit: 0, ySplit: 1 }
-    // Y los filtros ya puestos, que es lo primero que hace cualquiera al abrir.
-    hoja['!autofilter'] = {
-      ref: xlsx.utils.encode_range({
-        s: { r: 0, c: 0 },
-        e: { r: cuerpo.length, c: encabezado.length - 1 },
-      }),
-    }
-
     const libro = xlsx.utils.book_new()
-    xlsx.utils.book_append_sheet(libro, hoja, 'Catálogo')
+
+    xlsx.utils.book_append_sheet(
+      libro,
+      hojaTabular(xlsx, REGISTRO_DE_DATOS, maquinas),
+      REGISTRO_DE_DATOS.hoja,
+    )
+
+    // Sin datos de órdenes de trabajo: se entrega la plantilla con sus títulos.
+    const hojaOrdenes = xlsx.utils.aoa_to_sheet([ORDENES_DE_TRABAJO.columnas])
+    hojaOrdenes['!cols'] = ORDENES_DE_TRABAJO.columnas.map((rotulo) => ({
+      wch: Math.max(ANCHO_MINIMO, rotulo.length + 2),
+    }))
+    xlsx.utils.book_append_sheet(libro, hojaOrdenes, ORDENES_DE_TRABAJO.hoja)
+
+    xlsx.utils.book_append_sheet(
+      libro,
+      hojaTabular(xlsx, FICHA_TECNICA, maquinas),
+      FICHA_TECNICA.hoja,
+    )
+
     xlsx.utils.book_append_sheet(libro, hojaResumen(xlsx, maquinas, usuario), 'Resumen')
 
     const archivo = `catalogo-maquinaria-${sello()}.xlsx`

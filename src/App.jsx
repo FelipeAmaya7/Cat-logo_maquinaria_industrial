@@ -10,6 +10,7 @@ import { obtenerMaquinasPorId } from './data/catalogo'
 import { INSTITUCION } from './data/institucion'
 import { MAPA_CAMPOS } from './servicios/anclajeRotulos'
 import { descargarCatalogoExcel } from './servicios/exportarExcel'
+import { descargarCatalogoHtml } from './servicios/exportarHtml'
 import {
   cerrarSesion,
   guardarEdicion,
@@ -230,6 +231,16 @@ function App() {
     )
   }
 
+  /** Descarga el catálogo como documento HTML con formato. */
+  const exportarCatalogoHtml = () => {
+    const resultado = descargarCatalogoHtml(catalogoUsuario)
+    setAviso(
+      resultado.ok
+        ? { texto: `Catálogo descargado como «${resultado.archivo}».`, error: false }
+        : { texto: resultado.error, error: true },
+    )
+  }
+
   /** Cierra la sesión y devuelve la aplicación a su estado inicial. */
   const salir = () => {
     cerrarSesion()
@@ -299,6 +310,16 @@ function App() {
                     className="rounded-md border border-emerald-600 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400"
                   >
                     {exportando ? 'Generando…' : 'Descargar catálogo (.xlsx)'}
+                  </button>
+                )}
+
+                {catalogoUsuario.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={exportarCatalogoHtml}
+                    className="rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
+                  >
+                    Descargar catálogo (.html)
                   </button>
                 )}
               </div>
