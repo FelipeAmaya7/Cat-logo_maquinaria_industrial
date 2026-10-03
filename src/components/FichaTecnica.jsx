@@ -5,6 +5,7 @@ import { GRUPOS_RESUELTOS } from "../data/gruposFicha";
 import { descargarFichaExcel } from "../servicios/exportarExcel";
 import { descargarFichaHtml } from "../servicios/exportarHtml";
 import { TIPOS_IMAGEN, prepararFotografia } from "../servicios/imagen";
+import CampoFicha from "./CampoFicha";
 import { DistintivoSistema } from "./IconoSistema";
 
 /** Marcador que usa el extractor cuando el formato venía sin diligenciar. */
@@ -232,6 +233,53 @@ function ErrorCampo({ campo, mensaje }) {
       {mensaje}
     </p>
   );
+}
+
+/**
+ * Presenta un campo en modo lectura: da formato legible a fechas y evita
+ * que los campos no diligenciados se muestren como huecos en blanco.
+ */
+function renderValorLectura(definicion, valor) {
+  const vacio =
+    valor === undefined ||
+    valor === null ||
+    String(valor).trim() === "" ||
+    valor === SIN_DATO;
+
+  if (vacio) {
+    return <span className="text-xs italic text-gray-400">{SIN_DATO}</span>;
+  }
+
+  if (definicion.tipo === "date") {
+    const texto = String(valor).trim();
+    let formateado = texto;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) {
+      const [y, m, d] = texto.split("-");
+      formateado = `${d}/${m}/${y}`;
+    }
+
+    return (
+      <span className="inline-flex items-center gap-1.5 font-medium text-gray-800">
+        <svg
+          className="h-3.5 w-3.5 shrink-0 text-blue-600"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 9v7.5"
+          />
+        </svg>
+        {formateado}
+      </span>
+    );
+  }
+
+  return valor;
 }
 
 /**
@@ -521,23 +569,21 @@ function FichaTecnica({ maquina, onInicio, onGuardar, onEliminar }) {
             </h3>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-            {/*
-              En móvil la tabla se DESPLAZA en lugar de comprimirse: con dos
-              columnas por debajo de 360 px los rótulos se partían letra a letra.
-              El ancho mínimo fuerza el scroll solo cuando hace falta.
-            */}
+          <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
             <div className="-mx-1 overflow-x-auto px-1">
-              <table className="w-full min-w-[20rem] table-fixed border-collapse text-left">
+              <table className="w-full border-collapse text-left">
                 <caption className="sr-only">
                   Datos de identificación y operación del equipo
                 </caption>
-                <tbody>
-                  {CAMPOS.map(({ campo, rotulo, tipo }) => (
-                    <tr key={campo} className="border-b border-gray-300">
+                <tbody className="divide-y divide-gray-200 block sm:table-row-group">
+                  {CAMPOS.map((definicion) => {
+                    const { campo, rotulo } = definicion
+
+                    return (
+                    <tr key={campo} className="py-2.5 block sm:table-row sm:py-0">
                       <th
                         scope="row"
-                        className="w-2/5 py-2 pr-4 align-top text-[11px] font-bold uppercase tracking-wide text-gray-800"
+                        className="block sm:table-cell sm:w-2/5 sm:py-2.5 sm:pr-4 align-top text-xs font-bold uppercase tracking-wide text-gray-800 pb-1 sm:pb-0"
                       >
                         <label
                           htmlFor={editando ? `campo-${campo}` : undefined}
@@ -545,22 +591,19 @@ function FichaTecnica({ maquina, onInicio, onGuardar, onEliminar }) {
                           {rotulo}
                         </label>
                       </th>
-                      <td className="py-2 align-top text-sm text-gray-700">
+                      <td className="block sm:table-cell sm:w-3/5 sm:py-2.5 align-top text-sm text-gray-700">
                         {editando ? (
                           <>
-                            <input
+                            <CampoFicha
+                              definicion={definicion}
                               id={`campo-${campo}`}
-                              type="text"
-                              inputMode={tipo ? "numeric" : undefined}
-                              value={borrador[campo]}
-                              onChange={(evento) =>
-                                actualizar(campo, evento.target.value)
-                              }
-                              aria-invalid={Boolean(errores[campo])}
-                              aria-describedby={
+                              valor={borrador[campo]}
+                              onCambiar={(valor) => actualizar(campo, valor)}
+                              clase={claseCampo(Boolean(errores[campo]))}
+                              invalido={Boolean(errores[campo])}
+                              describedBy={
                                 errores[campo] ? `error-${campo}` : undefined
                               }
-                              className={claseCampo(Boolean(errores[campo]))}
                             />
                             <ErrorCampo
                               campo={campo}
@@ -568,11 +611,12 @@ function FichaTecnica({ maquina, onInicio, onGuardar, onEliminar }) {
                             />
                           </>
                         ) : (
-                          maquina[campo]
+                          renderValorLectura(definicion, maquina[campo])
                         )}
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -588,8 +632,11 @@ function FichaTecnica({ maquina, onInicio, onGuardar, onEliminar }) {
           </div>
 
           {/* Campos de texto extenso */}
-          <div className="grid grid-cols-1 gap-5 border-t border-gray-300 px-5 py-5 sm:grid-cols-3">
-            {BLOQUES.map(({ campo, rotulo }) => (
+          <div className="grid grid-cols-1 gap-5 border-t border-gray-300 px-5 py-5 md:grid-cols-3">
+            {BLOQUES.map((definicion) => {
+              const { campo, rotulo } = definicion
+
+              return (
               <div key={campo}>
                 <h4 className="border-b border-gray-300 pb-2 text-[11px] font-bold uppercase tracking-wide text-gray-800">
                   <label htmlFor={editando ? `campo-${campo}` : undefined}>
@@ -598,28 +645,28 @@ function FichaTecnica({ maquina, onInicio, onGuardar, onEliminar }) {
                 </h4>
                 {editando ? (
                   <>
-                    <textarea
+                    <CampoFicha
+                      definicion={definicion}
                       id={`campo-${campo}`}
-                      rows={4}
-                      value={borrador[campo]}
-                      onChange={(evento) =>
-                        actualizar(campo, evento.target.value)
-                      }
-                      aria-invalid={Boolean(errores[campo])}
-                      aria-describedby={
+                      valor={borrador[campo]}
+                      onCambiar={(valor) => actualizar(campo, valor)}
+                      clase={`mt-2 ${claseCampo(Boolean(errores[campo]))}`}
+                      invalido={Boolean(errores[campo])}
+                      describedBy={
                         errores[campo] ? `error-${campo}` : undefined
                       }
-                      className={`mt-2 ${claseCampo(Boolean(errores[campo]))} resize-y leading-relaxed`}
+                      filas={4}
                     />
                     <ErrorCampo campo={campo} mensaje={errores[campo]} />
                   </>
                 ) : (
                   <p className="pt-2 text-sm leading-relaxed text-gray-700">
-                    {maquina[campo]}
+                    {renderValorLectura(definicion, maquina[campo])}
                   </p>
                 )}
               </div>
-            ))}
+              )
+            })}
           </div>
 
           {/* Pie de documento */}

@@ -402,7 +402,7 @@ function App() {
     <div className="flex min-h-screen flex-col">
       <Header usuario={sesion.usuario} onCerrarSesion={salir} />
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-6 sm:px-6 sm:py-8">
         {enFicha ? (
           <FichaTecnica
             // Cambiar de ficha monta un componente nuevo: un borrador a medias
@@ -416,7 +416,7 @@ function App() {
         ) : (
           <>
             {/* Dos areas de trabajo: el inventario y las intervenciones. */}
-            <div className="mb-6 flex gap-1 border-b border-gray-300" role="tablist">
+            <div className="mb-6 flex gap-1 border-b border-gray-300 overflow-x-auto no-scrollbar scroll-smooth" role="tablist">
               {[
                 [VISTAS.CATALOGO, 'Catálogo', catalogoUsuario.length],
                 [VISTAS.ORDENES, 'Órdenes de trabajo', ordenes.length],
@@ -427,7 +427,7 @@ function App() {
                   role="tab"
                   aria-selected={vista === clave}
                   onClick={() => setVista(clave)}
-                  className={`-mb-px rounded-t-md border-b-2 px-4 py-2.5 text-sm font-semibold transition ${
+                  className={`-mb-px shrink-0 rounded-t-md border-b-2 px-3 py-2 text-xs sm:px-4 sm:py-2.5 sm:text-sm font-semibold transition ${
                     vista === clave
                       ? 'border-blue-600 text-blue-700'
                       : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'
@@ -473,86 +473,94 @@ function App() {
               </>
             ) : (
               <>
-            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="mb-6 flex flex-col gap-3">
               {/* Sin máquinas asignadas el buscador no aporta nada. */}
-              <div className="min-w-0 flex-1">
-                {catalogoUsuario.length > 0 && (
-                  <Buscador
-                    termino={termino}
-                    onBuscar={setTermino}
-                    resultados={maquinasFiltradas.length}
-                    total={catalogoUsuario.length}
-                  />
-                )}
-              </div>
-
-              <div className="flex shrink-0 flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setCreandoFicha(true)}
-                  className="rounded-md bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2"
-                >
-                  + Nueva ficha
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSubiendo(true)}
-                  className="rounded-md border border-emerald-600 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2"
-                >
-                  Subir ficha (Excel)
-                </button>
-
-                {catalogoUsuario.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={exportarCatalogo}
-                    disabled={exportando}
-                    className="rounded-md border border-emerald-600 bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400"
-                  >
-                    {exportando ? 'Generando…' : 'Descargar catálogo (.xlsx)'}
-                  </button>
-                )}
-
-                {catalogoUsuario.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={exportarCatalogoHtml}
-                    className="rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
-                  >
-                    Descargar catálogo (.html)
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => entradaLibro.current?.click()}
-                  className="rounded-md border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
-                >
-                  Abrir libro (.xlsx)
-                </button>
-
-                <input
-                  ref={entradaLibro}
-                  type="file"
-                  accept=".xlsx,.xls,.xlsm"
-                  className="hidden"
-                  onChange={(evento) => {
-                    abrirLibro(evento.target.files?.[0])
-                    // Permite volver a elegir el mismo archivo.
-                    evento.target.value = ''
-                  }}
+              {catalogoUsuario.length > 0 && (
+                <Buscador
+                  termino={termino}
+                  onBuscar={setTermino}
+                  resultados={maquinasFiltradas.length}
+                  total={catalogoUsuario.length}
                 />
+              )}
 
-                {(catalogoUsuario.length > 0 || ordenes.length > 0) && (
+              {/* Barra de acciones organizada por grupos: creación/importación y exportación/mantenimiento */}
+              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                   <button
                     type="button"
-                    onClick={() => setConfirmandoVaciado(true)}
-                    className="rounded-md border border-red-300 bg-white px-4 py-2.5 text-sm font-semibold text-red-700 shadow-sm transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300 focus:ring-offset-2"
+                    onClick={() => setCreandoFicha(true)}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 sm:px-3.5 sm:text-sm"
                   >
-                    Vaciar todo
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                    Nueva ficha
                   </button>
-                )}
+
+                  <button
+                    type="button"
+                    onClick={() => setSubiendo(true)}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-md border border-emerald-600 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 sm:px-3.5 sm:text-sm"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg>
+                    Subir ficha (Excel)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => entradaLibro.current?.click()}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 sm:px-3.5 sm:text-sm"
+                  >
+                    <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" /></svg>
+                    Abrir libro (.xlsx)
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  {catalogoUsuario.length > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={exportarCatalogo}
+                        disabled={exportando}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 disabled:cursor-not-allowed disabled:border-gray-200 disabled:text-gray-400 sm:px-3.5 sm:text-sm"
+                      >
+                        <svg className="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                        {exportando ? 'Generando…' : 'Catálogo (.xlsx)'}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={exportarCatalogoHtml}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 sm:px-3.5 sm:text-sm"
+                      >
+                        <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                        Catálogo (.html)
+                      </button>
+                    </>
+                  )}
+
+                  <input
+                    ref={entradaLibro}
+                    type="file"
+                    accept=".xlsx,.xls,.xlsm"
+                    className="hidden"
+                    onChange={(evento) => {
+                      abrirLibro(evento.target.files?.[0])
+                      // Permite volver a elegir el mismo archivo.
+                      evento.target.value = ''
+                    }}
+                  />
+
+                  {(catalogoUsuario.length > 0 || ordenes.length > 0) && (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmandoVaciado(true)}
+                      className="inline-flex items-center justify-center gap-1 rounded-md border border-red-200 bg-white px-2.5 py-2 text-xs font-semibold text-red-600 shadow-sm transition hover:border-red-300 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300 focus:ring-offset-2 sm:px-3 sm:text-sm"
+                    >
+                      Vaciar todo
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 

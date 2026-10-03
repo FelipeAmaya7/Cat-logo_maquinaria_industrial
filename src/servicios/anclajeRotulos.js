@@ -109,6 +109,98 @@ export const limpiar = (valor) =>
     ? SIN_DATO
     : normalizar(valor)
 
+/**
+ * Campos que la interfaz edita con un calendario (`<input type="date">`).
+ *
+ * Ese control SOLO acepta `AAAA-MM-DD`. Si recibe cualquier otra cosa se pinta
+ * vacío, y entonces el dato parece no existir y se pierde al guardar. Por eso
+ * las fechas que entran desde una hoja de cálculo se normalizan aquí.
+ */
+export const CAMPOS_FECHA = new Set(['fechaUltimaIntervencion', 'proximoMantenimiento'])
+
+/**
+ * ¿El texto está en el formato que entiende el calendario Y existe en el
+ * calendario?
+ *
+ * La forma no basta: «2026-22-09» cumple el patrón pero no hay un mes 22, y un
+ * `<input type="date">` que recibe eso se pinta VACÍO. Comprobar solo el patrón
+ * dejaba pasar justo los valores que hacen desaparecer el dato.
+ */
+export function esFechaIso(valor) {
+  const texto = String(valor ?? '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(texto)) return false
+
+  const [anio, mes, dia] = texto.split('-').map(Number)
+  const fecha = new Date(anio, mes - 1, dia)
+
+  // Si el día o el mes se desbordan, Date rueda al siguiente: 2026-02-31 pasa a
+  // ser el 3 de marzo. Comparar las tres partes delata ese ajuste silencioso.
+  return (
+    fecha.getFullYear() === anio && fecha.getMonth() === mes - 1 && fecha.getDate() === dia
+  )
+}
+
+/**
+ * Texto de fecha convertido a `AAAA-MM-DD`, o null si no se puede afirmar.
+ *
+ * Solo convierte lo INEQUÍVOCO:
+ *
+ *   - Ya en ISO (`2026-09-23`).
+ *   - Año primero con otros separadores (`2026/09/23`): un bloque de cuatro
+ *     dígitos al inicio solo puede ser el año, y no existe la convención
+ *     AAAA/DD/MM.
+ *
+ * Lo demás NO se adivina. «3/4/2026» puede ser el 3 de abril o el 4 de marzo
+ * según el idioma del equipo que generó la hoja, y convertirlo al azar corrompe
+ * el dato sin que nadie lo note. Quien llame decide qué hacer con el null; la
+ * interfaz muestra el texto para que la persona lo corrija.
+ *
+ * @param {string} texto
+ * @returns {string|null}
+ */
+export function aFechaIso(texto) {
+  const limpio = String(texto ?? '').trim()
+  if (!limpio) return null
+
+  const partes = /^(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})$/.exec(limpio)
+  if (!partes) return null
+
+  const [, anio, mes, dia] = partes
+  const iso = `${anio}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`
+
+  return esFechaIso(iso) ? iso : null
+}
+
+/**
+ * Fecha de una celda, en formato `AAAA-MM-DD` cuando se puede afirmar.
+ *
+ * Excel guarda la fecha como número de serie y la MUESTRA según la
+ * configuración regional: la misma celda se lee «9/22/26» en un equipo y
+ * «22/09/2026» en otro. Con `cellDates: true` la librería entrega además el
+ * objeto Date real, y de ahí sí sale una fecha inequívoca.
+ *
+ * Cuando la celda es texto suelto no se adivina: «3/4/2026» puede ser el 3 de
+ * abril o el 4 de marzo, y equivocarse en silencio es peor que no convertir.
+ * En ese caso se devuelve el texto tal cual y la interfaz lo muestra como
+ * casilla de texto, de modo que la persona lo vea y lo corrija.
+ *
+ * @param {Object|undefined} celda Celda en el formato de SheetJS.
+ * @param {string} texto           Lo que ya leyó `textoCelda`.
+ */
+export function limpiarFecha(celda, texto) {
+  const fecha = celda?.v
+
+  if (fecha instanceof Date && !Number.isNaN(fecha.getTime())) {
+    // Se compone a mano con las partes locales: `toISOString` pasa a UTC y
+    // puede restar un día según la zona horaria del navegador.
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0')
+    const dia = String(fecha.getDate()).padStart(2, '0')
+    return `${fecha.getFullYear()}-${mes}-${dia}`
+  }
+
+  return limpiar(texto)
+}
+
 /** El año puede venir como número, como fecha o como marcador. */
 export function limpiarAnio(valor) {
   const texto = limpiar(valor)
@@ -187,6 +279,18 @@ export function leerCampo(hoja, indice, rotulo) {
 }
 
 /**
+ * La celda en bruto de un rótulo, no su texto.
+ * Las fechas la necesitan: el texto ya perdió el objeto Date que permite
+ * normalizarlas sin adivinar el orden de día y mes.
+ */
+export function leerCelda(hoja, indice, rotulo) {
+  const ubicacion = indice.get(normalizarClave(rotulo))
+  if (!ubicacion?.celdaValor) return undefined
+
+  return hoja[ubicacion.celdaValor]
+}
+
+/**
  * Extrae todos los campos del mapa desde una hoja, ya normalizados.
  *
  * @param {Object} hoja
@@ -203,7 +307,13 @@ export function extraerFicha(hoja, decodificarColumna) {
     const crudo = leerCampo(hoja, indice, rotulo)
     if (crudo === null) faltantes.push(rotulo)
 
-    registro[campo] = campo === 'anioAdquisicion' ? limpiarAnio(crudo) : limpiar(crudo)
+    if (campo === 'anioAdquisicion') {
+      registro[campo] = limpiarAnio(crudo)
+    } else if (CAMPOS_FECHA.has(campo)) {
+      registro[campo] = limpiarFecha(leerCelda(hoja, indice, rotulo), crudo)
+    } else {
+      registro[campo] = limpiar(crudo)
+    }
   }
 
   return { registro, faltantes }

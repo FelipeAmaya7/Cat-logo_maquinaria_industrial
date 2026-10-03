@@ -19,10 +19,14 @@ export const CONTROLES = {
 
   anioAdquisicion: { tipo: "number", ph: "2020", etiqueta: "Año de compra" },
   anioInstalacion: { tipo: "number", ph: "2021", etiqueta: "Año instalación" },
-  nuevoUsado: { tipo: "select", opciones: ["NUEVO", "USADO"], etiqueta: "Nuevo-Usado" },
+  // «No registrado» es una opción real, no un hueco: 15 de las 49 fichas del
+  // libro de planta llegaron así, y sin ella el desplegable las dejaba en blanco.
+  nuevoUsado: { tipo: "select", opciones: ["NUEVO", "USADO", "No registrado"], etiqueta: "Nuevo-Usado" },
   vidaUtil: { tipo: "number", ph: "15", etiqueta: "Vida útil en años" },
   estado: { tipo: "select", opciones: ["BUENO", "REGULAR", "MALO", "CRÍTICO"], etiqueta: "Estado" },
-  disponibilidad: { tipo: "select", opciones: ["USO", "DISPONIBLE", "EN MANTENIMIENTO", "FUERA DE SERVICIO"], etiqueta: "Disponibilidad" },
+  // ALMACENADO viene del libro de planta y faltaba aquí. Los estilos de las
+  // tarjetas (ListaTarjetas) ya contemplaban USO, ALMACENADO y FUERA DE SERVICIO.
+  disponibilidad: { tipo: "select", opciones: ["USO", "DISPONIBLE", "ALMACENADO", "EN MANTENIMIENTO", "FUERA DE SERVICIO", "No registrado"], etiqueta: "Disponibilidad" },
   precio: { tipo: "number", ph: "0", etiqueta: "Precio" },
 
   ubicacion: { tipo: "text", ph: "Ej. Nave 1, Línea de corrugado, Troquelado", etiqueta: "Ubicación" },

@@ -76,19 +76,19 @@ function Tarjeta({ maquina, onSeleccionar }) {
         </h3>
 
         <dl className="space-y-1 text-xs text-slate-600">
-          <div className="flex gap-1">
-            <dt className="font-semibold text-slate-500">ID:</dt>
-            <dd className="font-mono">{maquina.id}</dd>
+          <div className="flex items-baseline gap-1.5">
+            <dt className="shrink-0 font-semibold text-slate-500">ID:</dt>
+            <dd className="font-mono text-gray-800">{maquina.id}</dd>
           </div>
-          <div className="flex gap-1">
-            <dt className="font-semibold text-slate-500">Marca:</dt>
-            <dd>
+          <div className="flex items-baseline gap-1.5">
+            <dt className="shrink-0 font-semibold text-slate-500">Marca:</dt>
+            <dd className="truncate text-gray-700" title={`${maquina.marca} · ${maquina.modelo}`}>
               {maquina.marca} · {maquina.modelo}
             </dd>
           </div>
-          <div className="flex gap-1">
-            <dt className="font-semibold text-slate-500">Ubicación:</dt>
-            <dd>{maquina.ubicacion}</dd>
+          <div className="flex items-baseline gap-1.5">
+            <dt className="shrink-0 font-semibold text-slate-500">Ubicación:</dt>
+            <dd className="truncate text-gray-700" title={maquina.ubicacion}>{maquina.ubicacion}</dd>
           </div>
         </dl>
 

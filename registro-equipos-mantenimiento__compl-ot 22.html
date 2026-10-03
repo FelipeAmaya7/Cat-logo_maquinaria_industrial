@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro de información</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#1c1c1a; --card:#282825; --border:#44443f; --text:#ece9e2; --muted:#a6a49b;
+    --accent:#9a9890; --accent-bg:#3c3c37; --danger:#e59a9a; --danger-bg:#3d2323;
+    --input-bg:#333330;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background:var(--bg); color:var(--text); margin:0; padding:2rem 1rem; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+  h2.section { font-size: 17px; font-weight: 600; margin: 2rem 0 0.75rem; }
+  .sub { color: var(--muted); font-size: 14px; margin: 0 0 1.5rem; }
+  .card { background: var(--card); border:1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
+  .filebar { display:flex; flex-wrap:wrap; align-items:center; gap: 10px; }
+  .filebar .status { font-size: 13px; color: var(--muted); flex:1; min-width:200px; }
+  .filebar .status.linked { color: var(--accent); font-weight: 600; }
+  label { display:block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  input, textarea, select { width:100%; padding: 8px 10px; border:1px solid var(--border); border-radius: 8px; font-size: 14px; background:var(--input-bg); color:var(--text); }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+  input[readonly] { background: #242421; color: var(--muted); }
+  .grid { display:grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 1rem; }
+  .grid.two { grid-template-columns: repeat(2, 1fr); }
+  .grid.four { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 700px) { .grid, .grid.two, .grid.four { grid-template-columns: 1fr; } }
+  .maintenance { background: #242421; border:1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: 1rem; }
+  .maintenance p.h { font-weight: 600; font-size: 15px; margin: 0 0 10px; color: var(--text); }
+  button { cursor:pointer; border-radius: 8px; border: 1px solid var(--border); background:var(--card); padding: 9px 14px; font-size: 14px; color: var(--text); }
+  button:hover { background: #35352f; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #1c1c1a; font-weight: 600; }
+  button.primary:hover { background: #b3b1a8; }
+  button.danger { color: var(--danger); }
+  .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top: 4px; }
+  table { width:100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align:left; padding: 8px; border-bottom: 1px solid var(--border); white-space: nowrap; max-width: 220px; overflow:hidden; text-overflow: ellipsis; }
+  th { color: var(--muted); font-weight: 600; position: sticky; top:0; background: var(--card); }
+  tbody tr:hover { background: #303029; }
+  .tablewrap { overflow-x:auto; max-height: 420px; overflow-y:auto; }
+  .empty { text-align:center; color: var(--muted); padding: 2rem 0; font-size: 14px; }
+  .error { color: var(--danger); background: var(--danger-bg); border-radius: 8px; padding: 8px 12px; font-size: 13px; margin-bottom: 10px; display:none; }
+  .badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--accent-bg); color: var(--text); }
+  .note { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .del { color: var(--danger); border-color: var(--danger-bg); }
+  .success { color: #b7d7a0; background: #26361f; border-radius: 8px; padding: 8px 12px; font-size: 13px; margin-top: 10px; display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Registro de información</h1>
+  <p class="sub">Registra el historial de mantenimiento de cada equipo y sus órdenes de trabajo, enlazado directamente a un archivo Excel que actúa como base de datos.</p>
+
+  <div class="card">
+    <div class="filebar">
+      <span class="status" id="fileStatus">Sin archivo cargado. Abre un Excel existente o empieza uno nuevo.</span>
+      <button id="openBtn">Abrir Excel existente</button>
+      <button id="newBtn">Vaciar y empezar de nuevo</button>
+      <button class="primary" id="downloadBtn">Descargar Excel actualizado</button>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx" style="display:none;">
+    <p class="note" id="apiNote">Los datos que agregues se guardan en memoria mientras tengas esta página abierta. Cuando quieras conservarlos, usa "Descargar Excel actualizado" para bajar el archivo con toda la información.</p>
+    <p class="note" id="countsNote">Equipos: 0 · Órdenes de trabajo: 0 · Fichas técnicas: 0</p>
+  </div>
+
+  <h2 class="section">Datos del equipo</h2>
+  <div class="card">
+    <div class="error" id="errorMsg"></div>
+    <div class="grid">
+      <div><label>Marca</label><input id="marca" placeholder="Ej. Toyota"></div>
+      <div><label>Modelo</label><input id="modelo" placeholder="Ej. Hilux 2020"></div>
+      <div><label>Serie</label><input id="serie" placeholder="Número de serie"></div>
+      <div><label>Código</label><input id="codigo" placeholder="Código interno"></div>
+      <div><label>Año de compra</label><input id="anioCompra" type="number" placeholder="2020"></div>
+      <div><label>Precio</label><input id="precio" type="number" placeholder="0"></div>
+      <div><label>Año instalación</label><input id="anioInstalacion" type="number" placeholder="2021"></div>
+      <div><label>Ubicación</label><input id="ubicacion" placeholder="Ej. Patio 2, bahía 4"></div>
+      <div><label>Responsable</label><input id="responsable" placeholder="Ej. Juan Pérez"></div>
+    </div>
+    <div class="grid two">
+      <div><label>Fecha última intervención</label><input id="fechaUltima" type="date"></div>
+    </div>
+
+    <div class="maintenance">
+      <p class="h"><span class="badge">Historial de mantenimiento</span> &nbsp;Información de mantenimiento</p>
+      <div class="grid two" style="margin-bottom:0;">
+        <div><label>Intervenciones</label><textarea id="intervenciones" rows="2" placeholder="Ej. Cambio de aceite, revisión de frenos"></textarea></div>
+        <div><label>Modificaciones</label><textarea id="modificaciones" rows="2" placeholder="Ej. Cambio de sistema de suspensión"></textarea></div>
+      </div>
+      <div style="margin-top:12px;"><label>Actualizaciones</label><textarea id="actualizaciones" rows="2" placeholder="Ej. Actualización de software del ECU"></textarea></div>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="addBtn">Agregar registro</button>
+      <button id="clearFormBtn">Limpiar formulario</button>
+      <button class="danger" id="clearAllBtn">Borrar todos los registros</button>
+    </div>
+    <div class="success" id="successMsg">Registro guardado.</div>
+  </div>
+
+  <p class="note">El listado completo de equipos registrados solo está disponible para el jefe de taller, a través del archivo Excel enlazado.</p>
+
+  <h2 class="section">Órdenes de trabajo</h2>
+  <div class="card">
+    <div class="error" id="errorMsgOT"></div>
+    <div class="grid four">
+      <div><label>N° de orden</label><input id="otNumero" readonly></div>
+      <div><label>Fecha</label><input id="otFecha" type="date"></div>
+      <div><label>Equipo a intervenir</label>
+        <select id="otEquipo">
+          <option value="">Selecciona un equipo...</option>
+        </select>
+      </div>
+      <div><label>Ubicación</label><input id="otUbicacion" placeholder="Ej. Patio 2, bahía 4"></div>
+    </div>
+    <div class="grid">
+      <div><label>Marca</label><input id="otMarca" readonly placeholder="Se completa al elegir el equipo"></div>
+      <div><label>Modelo</label><input id="otModelo" readonly placeholder="Se completa al elegir el equipo"></div>
+      <div><label>Serie</label><input id="otSerie" readonly placeholder="Se completa al elegir el equipo"></div>
+    </div>
+    <div class="grid">
+      <div>
+        <label>Mantenimiento</label>
+        <select id="otTipoMantenimiento">
+          <option value="">Selecciona...</option>
+          <option value="Correctivo">Correctivo</option>
+          <option value="Preventivo">Preventivo</option>
+          <option value="Predictivo">Predictivo</option>
+        </select>
+      </div>
+      <div><label>Insumos / repuestos</label><input id="otInsumos" placeholder="Ej. Filtro de aceite, pastillas de freno"></div>
+      <div><label>Técnico</label><input id="otTecnico" placeholder="Nombre del técnico"></div>
+    </div>
+    <div class="grid">
+      <div><label>Falla</label><input id="otFalla" placeholder="Descripción de la falla"></div>
+      <div><label>Sistema intervenido</label><input id="otSistema" placeholder="Ej. Sistema eléctrico"></div>
+      <div><label>Duración de la reparación</label><input id="otDuracion" placeholder="Ej. 2 horas"></div>
+    </div>
+    <div class="grid two">
+      <div><label>Seguridad</label><input id="otSeguridad" placeholder="Elementos y medidas de seguridad usadas"></div>
+    </div>
+
+    <div class="maintenance">
+      <p class="h">Observaciones y responsables</p>
+      <div class="grid" style="margin-bottom:0;">
+        <div><label>Observaciones</label><textarea id="otObservaciones" rows="2" placeholder="Observaciones generales"></textarea></div>
+        <div><label>Técnico responsable</label><input id="otTecnicoResponsable" placeholder="Nombre"></div>
+        <div><label>Supervisor responsable</label><input id="otSupervisorResponsable" placeholder="Nombre"></div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="addOtBtn">Agregar orden de trabajo</button>
+      <button id="clearOtFormBtn">Limpiar formulario</button>
+      <button class="danger" id="clearAllOtBtn">Borrar todas las órdenes</button>
+    </div>
+    <div class="success" id="successMsgOt">Orden de trabajo guardada.</div>
+  </div>
+
+  <p class="note">El listado completo de órdenes de trabajo solo está disponible para el jefe de taller, a través del archivo Excel enlazado.</p>
+
+  <h2 class="section">Ficha técnica</h2>
+  <div class="card">
+    <div class="error" id="errorMsgFt"></div>
+
+    <div class="maintenance">
+      <p class="h"><span class="badge">Identificación</span> &nbsp;Datos generales del vehículo</p>
+      <div class="grid">
+        <div><label>Placa</label><input id="ftPlaca" placeholder="Ej. SZC-123"></div>
+        <div><label>Código interno / N° de flota</label><input id="ftCodigo" placeholder="Código interno"></div>
+        <div><label>Marca</label><input id="ftMarca" placeholder="Ej. BYD"></div>
+        <div><label>Modelo / línea</label><input id="ftModeloLinea" placeholder="Ej. BC-89"></div>
+        <div><label>Año de fabricación</label><input id="ftAnioFabricacion" type="number" placeholder="2022"></div>
+        <div><label>VIN / N° de chasis</label><input id="ftVin" placeholder="Número de chasis"></div>
+        <div><label>Número de motor</label><input id="ftNumeroMotor" placeholder="N° de motor"></div>
+        <div><label>Fecha de ingreso a operación</label><input id="ftFechaIngreso" type="date"></div>
+        <div><label>Ruta / zona asignada</label><input id="ftRuta" placeholder="Ej. Ruta 12 - Usme"></div>
+      </div>
+    </div>
+
+    <div class="maintenance">
+      <p class="h"><span class="badge">Propulsión</span> &nbsp;Sistema de propulsión eléctrica</p>
+      <div class="grid">
+        <div><label>Tipo de batería</label><input id="ftTipoBateria" placeholder="Ej. LFP"></div>
+        <div><label>Capacidad de batería (kWh)</label><input id="ftCapacidadBateria" type="number" placeholder="0"></div>
+        <div><label>Voltaje sistema alta tensión (V)</label><input id="ftVoltajeAlta" type="number" placeholder="650"></div>
+        <div><label>Voltaje sistema baja tensión (V)</label><input id="ftVoltajeBaja" type="number" placeholder="24"></div>
+        <div><label>Tipo de motor eléctrico</label><input id="ftTipoMotorElectrico" placeholder="Ej. Síncrono de imanes permanentes"></div>
+        <div><label>Potencia motor (kW)</label><input id="ftPotenciaMotor" type="number" placeholder="0"></div>
+        <div><label>Torque máximo (Nm)</label><input id="ftTorqueMaximo" type="number" placeholder="0"></div>
+        <div><label>Autonomía estimada (km)</label><input id="ftAutonomia" type="number" placeholder="0"></div>
+        <div><label>Tipo de cargador / conector</label><input id="ftCargador" placeholder="Ej. Pantógrafo / CCS2"></div>
+      </div>
+    </div>
+
+    <div class="maintenance">
+      <p class="h"><span class="badge">Componentes clave</span> &nbsp;Elementos críticos del sistema</p>
+      <div class="grid">
+        <div><label>Convertidor DC-DC (marca/referencia)</label><input id="ftConvertidorDcDc" placeholder="Marca / referencia"></div>
+        <div><label>Sistema BMS</label><input id="ftBms" placeholder="Marca / referencia"></div>
+        <div><label>Inversor</label><input id="ftInversor" placeholder="Marca / referencia"></div>
+        <div><label>Frenado regenerativo</label>
+          <select id="ftFrenadoRegenerativo">
+            <option value="">Selecciona...</option>
+            <option value="Sí">Sí</option>
+            <option value="No">No</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="maintenance">
+      <p class="h"><span class="badge">Dimensiones</span> &nbsp;Dimensiones y capacidad</p>
+      <div class="grid">
+        <div><label>Longitud (m)</label><input id="ftLongitud" type="number" placeholder="0"></div>
+        <div><label>Ancho (m)</label><input id="ftAncho" type="number" placeholder="0"></div>
+        <div><label>Alto (m)</label><input id="ftAlto" type="number" placeholder="0"></div>
+        <div><label>Peso vacío (kg)</label><input id="ftPesoVacio" type="number" placeholder="0"></div>
+        <div><label>Peso bruto vehicular (kg)</label><input id="ftPesoBruto" type="number" placeholder="0"></div>
+        <div><label>Capacidad pasajeros sentados</label><input id="ftPasajerosSentados" type="number" placeholder="0"></div>
+        <div><label>Capacidad pasajeros de pie</label><input id="ftPasajerosPie" type="number" placeholder="0"></div>
+      </div>
+    </div>
+
+    <div class="maintenance">
+      <p class="h"><span class="badge">Mantenimiento</span> &nbsp;Estado de mantenimiento</p>
+      <div class="grid">
+        <div><label>Kilometraje actual</label><input id="ftKilometrajeActual" type="number" placeholder="0"></div>
+        <div><label>Fecha último mantenimiento preventivo</label><input id="ftFechaUltimoMtto" type="date"></div>
+        <div><label>Próximo mantenimiento programado</label><input id="ftProximoMtto" type="date"></div>
+        <div><label>Responsable técnico</label><input id="ftResponsableTecnico" placeholder="Nombre"></div>
+      </div>
+    </div>
+
+    <div class="maintenance">
+      <p class="h"><span class="badge">Documentación</span> &nbsp;Vigencias y referencias</p>
+      <div class="grid">
+        <div><label>Vencimiento SOAT</label><input id="ftVencSoat" type="date"></div>
+        <div><label>Vencimiento tecnomecánica</label><input id="ftVencTecnomecanica" type="date"></div>
+        <div><label>Manual técnico (enlace/referencia)</label><input id="ftManualTecnico" placeholder="Enlace o código de referencia"></div>
+        <div><label>Vigencia garantía</label><input id="ftGarantia" placeholder="Ej. hasta dic 2027"></div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="addFtBtn">Agregar ficha técnica</button>
+      <button id="clearFtFormBtn">Limpiar formulario</button>
+      <button class="danger" id="clearAllFtBtn">Borrar todas las fichas</button>
+    </div>
+    <div class="success" id="successMsgFt">Ficha técnica guardada.</div>
+  </div>
+
+  <p class="note">El listado completo de fichas técnicas solo está disponible para el jefe de taller, a través del archivo Excel enlazado.</p>
+</div>
+
+<script>
+const HEADERS = ["Marca","Modelo","Serie","Código","Año de compra","Precio","Año instalación","Ubicación","Responsable","Fecha última intervención","Intervenciones","Modificaciones","Actualizaciones"];
+const FIELD_IDS = ["marca","modelo","serie","codigo","anioCompra","precio","anioInstalacion","ubicacion","responsable","fechaUltima","intervenciones","modificaciones","actualizaciones"];
+
+const OT_HEADERS = ["N° de orden","Fecha","Equipo a intervenir","Marca","Modelo","Serie","Ubicación","Mantenimiento","Insumos / repuestos","Técnico","Falla","Sistema intervenido","Duración de la reparación","Seguridad","Observaciones","Técnico responsable","Supervisor responsable"];
+const OT_FIELD_IDS = ["otNumero","otFecha","otEquipo","otMarca","otModelo","otSerie","otUbicacion","otTipoMantenimiento","otInsumos","otTecnico","otFalla","otSistema","otDuracion","otSeguridad","otObservaciones","otTecnicoResponsable","otSupervisorResponsable"];
+const OT_FORM_FIELD_IDS = OT_FIELD_IDS.filter(id => id !== "otNumero");
+
+const FT_HEADERS = ["Placa","Código interno","Marca","Modelo / línea","Año de fabricación","VIN / N° de chasis","Número de motor","Fecha de ingreso a operación","Ruta / zona asignada","Tipo de batería","Capacidad de batería (kWh)","Voltaje alta tensión (V)","Voltaje baja tensión (V)","Tipo de motor eléctrico","Potencia motor (kW)","Torque máximo (Nm)","Autonomía estimada (km)","Tipo de cargador / conector","Convertidor DC-DC","Sistema BMS","Inversor","Frenado regenerativo","Longitud (m)","Ancho (m)","Alto (m)","Peso vacío (kg)","Peso bruto vehicular (kg)","Pasajeros sentados","Pasajeros de pie","Kilometraje actual","Fecha último mantenimiento preventivo","Próximo mantenimiento programado","Responsable técnico","Vencimiento SOAT","Vencimiento tecnomecánica","Manual técnico","Vigencia garantía"];
+const FT_FIELD_IDS = ["ftPlaca","ftCodigo","ftMarca","ftModeloLinea","ftAnioFabricacion","ftVin","ftNumeroMotor","ftFechaIngreso","ftRuta","ftTipoBateria","ftCapacidadBateria","ftVoltajeAlta","ftVoltajeBaja","ftTipoMotorElectrico","ftPotenciaMotor","ftTorqueMaximo","ftAutonomia","ftCargador","ftConvertidorDcDc","ftBms","ftInversor","ftFrenadoRegenerativo","ftLongitud","ftAncho","ftAlto","ftPesoVacio","ftPesoBruto","ftPasajerosSentados","ftPasajerosPie","ftKilometrajeActual","ftFechaUltimoMtto","ftProximoMtto","ftResponsableTecnico","ftVencSoat","ftVencTecnomecanica","ftManualTecnico","ftGarantia"];
+
+let records = [];
+let otRecords = [];
+let ftRecords = [];
+const fileStatus = document.getElementById("fileStatus");
+const apiNote = document.getElementById("apiNote");
+const countsNote = document.getElementById("countsNote");
+const downloadBtn = document.getElementById("downloadBtn");
+const fileInput = document.getElementById("fileInput");
+
+function showError(msg) {
+  const e = document.getElementById("errorMsg");
+  e.textContent = msg;
+  e.style.display = "block";
+}
+function clearError() {
+  document.getElementById("errorMsg").style.display = "none";
+}
+function showErrorOt(msg) {
+  const e = document.getElementById("errorMsgOT");
+  e.textContent = msg;
+  e.style.display = "block";
+}
+function clearErrorOt() {
+  document.getElementById("errorMsgOT").style.display = "none";
+}
+function showErrorFt(msg) {
+  const e = document.getElementById("errorMsgFt");
+  e.textContent = msg;
+  e.style.display = "block";
+}
+function clearErrorFt() {
+  document.getElementById("errorMsgFt").style.display = "none";
+}
+
+function setNextOtNumero() {
+  document.getElementById("otNumero").value = otRecords.length + 1;
+}
+
+function buildWorkbook() {
+  const wb = XLSX.utils.book_new();
+
+  const rows = records.map(r => FIELD_IDS.map(id => r[id] || ""));
+  const ws = XLSX.utils.aoa_to_sheet([HEADERS, ...rows]);
+  ws['!cols'] = HEADERS.map(() => ({ wch: 20 }));
+  XLSX.utils.book_append_sheet(wb, ws, "Registro de datos");
+
+  const otRows = otRecords.map(r => OT_FIELD_IDS.map(id => r[id] || ""));
+  const wsOt = XLSX.utils.aoa_to_sheet([OT_HEADERS, ...otRows]);
+  wsOt['!cols'] = OT_HEADERS.map(() => ({ wch: 20 }));
+  XLSX.utils.book_append_sheet(wb, wsOt, "Ordenes de trabajo");
+
+  const ftRows = ftRecords.map(r => FT_FIELD_IDS.map(id => r[id] || ""));
+  const wsFt = XLSX.utils.aoa_to_sheet([FT_HEADERS, ...ftRows]);
+  wsFt['!cols'] = FT_HEADERS.map(() => ({ wch: 20 }));
+  XLSX.utils.book_append_sheet(wb, wsFt, "Ficha técnica");
+
+  return wb;
+}
+
+function sheetToRecords(ws, fieldIds) {
+  const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+  const rows = data.slice(1).filter(r => r.some(c => c !== undefined && c !== ""));
+  return rows.map(r => {
+    const obj = {};
+    fieldIds.forEach((id, i) => obj[id] = r[i] !== undefined ? String(r[i]) : "");
+    return obj;
+  });
+}
+
+function workbookToRecords(wb) {
+  const mainSheet = wb.Sheets["Registro de datos"] || wb.Sheets["Equipos"];
+  records = mainSheet ? sheetToRecords(mainSheet, FIELD_IDS) : [];
+  otRecords = wb.Sheets["Ordenes de trabajo"] ? sheetToRecords(wb.Sheets["Ordenes de trabajo"], OT_FIELD_IDS) : [];
+  ftRecords = wb.Sheets["Ficha técnica"] ? sheetToRecords(wb.Sheets["Ficha técnica"], FT_FIELD_IDS) : [];
+}
+
+function refreshOtEquipoOptions() {
+  const select = document.getElementById("otEquipo");
+  const current = select.value;
+  select.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = records.length === 0 ? "No hay equipos registrados" : "Selecciona un equipo...";
+  select.appendChild(placeholder);
+  records.forEach(r => {
+    const option = document.createElement("option");
+    const label = [r.marca, r.modelo].filter(Boolean).join(" ") + (r.codigo ? " — " + r.codigo : "");
+    option.value = r.codigo || label;
+    option.textContent = label || "(sin datos)";
+    option.dataset.marca = r.marca || "";
+    option.dataset.modelo = r.modelo || "";
+    option.dataset.serie = r.serie || "";
+    select.appendChild(option);
+  });
+  if ([...select.options].some(o => o.value === current)) select.value = current;
+}
+
+function fillOtEquipoDatos() {
+  const select = document.getElementById("otEquipo");
+  const selected = select.options[select.selectedIndex];
+  document.getElementById("otMarca").value = selected ? (selected.dataset.marca || "") : "";
+  document.getElementById("otModelo").value = selected ? (selected.dataset.modelo || "") : "";
+  document.getElementById("otSerie").value = selected ? (selected.dataset.serie || "") : "";
+}
+
+function findRecordByCodigo(codigo) {
+  if (!codigo) return null;
+  return records.find(r => r.codigo && r.codigo.toLowerCase() === codigo.toLowerCase());
+}
+
+function render() {
+  // El listado de equipos ya no se muestra en pantalla; los datos se guardan directamente en el Excel enlazado.
+}
+
+function renderOt() {
+  // El listado de órdenes de trabajo ya no se muestra en pantalla; los datos se guardan directamente en el Excel enlazado.
+}
+
+function updateCounts() {
+  countsNote.textContent = "Equipos: " + records.length + " · Órdenes de trabajo: " + otRecords.length + " · Fichas técnicas: " + ftRecords.length;
+}
+
+async function persist() {
+  updateCounts();
+}
+
+document.getElementById("openBtn").onclick = () => {
+  clearError();
+  fileInput.click();
+};
+
+fileInput.onchange = async () => {
+  const file = fileInput.files[0];
+  fileInput.value = "";
+  if (!file) return;
+  try {
+    clearError();
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    workbookToRecords(wb);
+    fileStatus.textContent = "Datos cargados de: " + file.name + " (recuerda descargar de nuevo para guardar cambios).";
+    fileStatus.classList.add("linked");
+    render();
+    renderOt();
+    setNextOtNumero();
+    refreshOtEquipoOptions();
+    await persist();
+  } catch (e) {
+    showError("No se pudo leer el archivo: " + e.message);
+  }
+};
+
+document.getElementById("newBtn").onclick = async () => {
+  if (records.length || otRecords.length || ftRecords.length) {
+    if (!confirm("¿Vaciar todos los datos cargados en memoria? Descarga el Excel antes si no quieres perderlos.")) return;
+  }
+  records = [];
+  otRecords = [];
+  ftRecords = [];
+  render();
+  renderOt();
+  setNextOtNumero();
+  refreshOtEquipoOptions();
+  fileStatus.textContent = "Registro nuevo (sin archivo cargado).";
+  fileStatus.classList.remove("linked");
+  await persist();
+};
+
+downloadBtn.onclick = async () => {
+  clearError();
+  const wb = buildWorkbook();
+  const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const filename = "registro-equipos-mantenimiento.xlsx";
+
+  if (window.claude && typeof window.claude.use === "function") {
+    try {
+      const downloads = await window.claude.use("downloads");
+      if (!downloads) {
+        showError("La descarga no está disponible en esta vista.");
+        return;
+      }
+      await downloads.save({ filename, data: blob });
+    } catch (e) {
+      if (e && e.code === "declined") return;
+      showError("No se pudo descargar el archivo: " + (e && e.message ? e.message : e));
+    }
+    return;
+  }
+
+  // Fuera del visor de Claude (archivo abierto directamente en el navegador): descarga estándar.
+  XLSX.writeFile(wb, filename);
+};
+
+document.getElementById("addBtn").onclick = async () => {
+  const marca = document.getElementById("marca").value.trim();
+  const modelo = document.getElementById("modelo").value.trim();
+  const codigo = document.getElementById("codigo").value.trim();
+  if (!marca || !modelo) {
+    showError("Ingresa al menos marca y modelo antes de agregar.");
+    return;
+  }
+  if (codigo && findRecordByCodigo(codigo)) {
+    showError("Código duplicado: ya existe un equipo registrado con el código interno \"" + codigo + "\".");
+    return;
+  }
+  clearError();
+  const record = {};
+  FIELD_IDS.forEach(id => record[id] = document.getElementById(id).value.trim());
+  records.push(record);
+  FIELD_IDS.forEach(id => document.getElementById(id).value = "");
+  render();
+  refreshOtEquipoOptions();
+  await persist();
+  const successMsg = document.getElementById("successMsg");
+  successMsg.style.display = "block";
+  clearTimeout(window._successMsgTimeout);
+  window._successMsgTimeout = setTimeout(() => successMsg.style.display = "none", 3000);
+};
+
+document.getElementById("clearFormBtn").onclick = () => {
+  FIELD_IDS.forEach(id => document.getElementById(id).value = "");
+  clearError();
+};
+
+document.getElementById("clearAllBtn").onclick = async () => {
+  if (records.length === 0) return;
+  if (!confirm("¿Borrar todos los registros de equipos? Esta acción no se puede deshacer.")) return;
+  records = [];
+  render();
+  refreshOtEquipoOptions();
+  await persist();
+};
+
+document.getElementById("addOtBtn").onclick = async () => {
+  const equipo = document.getElementById("otEquipo").value.trim();
+  const tipo = document.getElementById("otTipoMantenimiento").value;
+  if (!equipo) {
+    showErrorOt("Ingresa el equipo a intervenir antes de agregar la orden.");
+    return;
+  }
+  if (!tipo) {
+    showErrorOt("Selecciona el tipo de mantenimiento.");
+    return;
+  }
+  clearErrorOt();
+  const record = {};
+  OT_FIELD_IDS.forEach(id => record[id] = document.getElementById(id).value.trim());
+  record.otNumero = String(otRecords.length + 1);
+  otRecords.push(record);
+  OT_FORM_FIELD_IDS.forEach(id => document.getElementById(id).value = "");
+  renderOt();
+  setNextOtNumero();
+  await persist();
+  const successMsgOt = document.getElementById("successMsgOt");
+  successMsgOt.style.display = "block";
+  clearTimeout(window._successMsgOtTimeout);
+  window._successMsgOtTimeout = setTimeout(() => successMsgOt.style.display = "none", 3000);
+};
+
+document.getElementById("clearOtFormBtn").onclick = () => {
+  OT_FORM_FIELD_IDS.forEach(id => document.getElementById(id).value = "");
+  clearErrorOt();
+};
+
+document.getElementById("clearAllOtBtn").onclick = async () => {
+  if (otRecords.length === 0) return;
+  if (!confirm("¿Borrar todas las órdenes de trabajo? Esta acción no se puede deshacer.")) return;
+  otRecords = [];
+  renderOt();
+  setNextOtNumero();
+  await persist();
+};
+
+document.getElementById("addFtBtn").onclick = async () => {
+  const placa = document.getElementById("ftPlaca").value.trim();
+  const codigo = document.getElementById("ftCodigo").value.trim();
+  if (!placa && !codigo) {
+    showErrorFt("Ingresa al menos la placa o el código interno antes de agregar.");
+    return;
+  }
+  clearErrorFt();
+  const record = {};
+  FT_FIELD_IDS.forEach(id => record[id] = document.getElementById(id).value.trim());
+  ftRecords.push(record);
+  FT_FIELD_IDS.forEach(id => document.getElementById(id).value = "");
+  await persist();
+  const successMsgFt = document.getElementById("successMsgFt");
+  successMsgFt.style.display = "block";
+  clearTimeout(window._successMsgFtTimeout);
+  window._successMsgFtTimeout = setTimeout(() => successMsgFt.style.display = "none", 3000);
+};
+
+document.getElementById("clearFtFormBtn").onclick = () => {
+  FT_FIELD_IDS.forEach(id => document.getElementById(id).value = "");
+  clearErrorFt();
+};
+
+document.getElementById("clearAllFtBtn").onclick = async () => {
+  if (ftRecords.length === 0) return;
+  if (!confirm("¿Borrar todas las fichas técnicas? Esta acción no se puede deshacer.")) return;
+  ftRecords = [];
+  await persist();
+};
+
+render();
+renderOt();
+setNextOtNumero();
+refreshOtEquipoOptions();
+document.getElementById("otEquipo").addEventListener("change", fillOtEquipoDatos);
+</script>
+</body>
+</html>
