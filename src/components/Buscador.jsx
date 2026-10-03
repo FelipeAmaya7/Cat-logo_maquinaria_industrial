@@ -12,13 +12,20 @@
  */
 function Buscador({ termino, onBuscar, resultados, total }) {
   return (
-    <section className="mb-6" aria-label="Búsqueda de maquinaria">
-      <label
-        htmlFor="buscador-maquinas"
-        className="mb-2 block text-xs font-bold uppercase tracking-wide text-gray-800"
-      >
-        Buscar máquina
-      </label>
+    <section className="mb-4" aria-label="Búsqueda de maquinaria">
+      <div className="mb-1.5 flex flex-col gap-0.5 sm:flex-row sm:items-center sm:justify-between">
+        <label
+          htmlFor="buscador-maquinas"
+          className="text-xs font-bold uppercase tracking-wide text-gray-800"
+        >
+          Buscar máquina
+        </label>
+
+        <p className="text-xs text-slate-500" role="status">
+          Mostrando <strong className="text-gray-800">{resultados}</strong> de {total}{' '}
+          {total === 1 ? 'máquina registrada' : 'máquinas registradas'}
+        </p>
+      </div>
 
       <div className="relative">
         <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
@@ -43,24 +50,19 @@ function Buscador({ termino, onBuscar, resultados, total }) {
           onChange={(evento) => onBuscar(evento.target.value)}
           placeholder="Nombre, placa o ID (ej.: flexográfica, EM00012, YAOTA)"
           autoComplete="off"
-          className="w-full rounded-md border border-gray-300 bg-white py-3 pl-10 pr-24 text-sm shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+          className="w-full rounded-md border border-gray-300 bg-white py-2.5 pl-10 pr-24 text-sm shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
         />
 
         {termino && (
           <button
             type="button"
             onClick={() => onBuscar('')}
-            className="absolute inset-y-0 right-0 my-1.5 mr-1.5 rounded px-3 text-xs font-semibold uppercase tracking-wide text-blue-600 transition hover:bg-blue-50"
+            className="absolute inset-y-0 right-0 my-1 mr-1.5 rounded px-3 text-xs font-semibold uppercase tracking-wide text-blue-600 transition hover:bg-blue-50"
           >
             Limpiar
           </button>
         )}
       </div>
-
-      <p className="mt-2 text-xs text-slate-500" role="status">
-        Mostrando <strong className="text-gray-800">{resultados}</strong> de {total}{' '}
-        {total === 1 ? 'máquina registrada' : 'máquinas registradas'}
-      </p>
     </section>
   )
 }

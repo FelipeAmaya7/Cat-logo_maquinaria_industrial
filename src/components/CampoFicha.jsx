@@ -16,8 +16,175 @@
  * de la ficha usa controles compactos y el formulario los usa holgados.
  */
 
-import { esFechaIso } from '../servicios/anclajeRotulos'
+import { useRef } from 'react'
+import { SIN_DATO, aFechaIso, esFechaIso } from '../servicios/anclajeRotulos'
 import { opcionesConValorActual } from '../data/opcionesCampo'
+
+/**
+ * Valor listo para un `<input type="date">`, o null si no se puede afirmar.
+ *
+ * Devuelve cadena vacía para lo que está sin diligenciar —vacío o el marcador
+ * `No registrado`— de modo que el calendario se pinte listo para usarse en vez
+ * de degradarse a casilla de texto por un dato que simplemente no existe.
+ *
+ * El criterio de qué es una fecha NO se decide aquí: se toma de
+ * `anclajeRotulos.js`, el mismo que usa el lector de hojas de cálculo. Tener
+ * dos reglas distintas para lo mismo es lo que hizo falta arreglar: una de
+ * ellas adivinaba el orden de día y mes y producía fechas inexistentes como
+ * «2026-22-09», que el navegador acepta en silencio y pinta vacías.
+ *
+ * @param {string} texto
+ * @returns {string|null} ISO, cadena vacía, o null si el texto no es fecha.
+ */
+function valorParaCalendario(texto) {
+  const limpio = String(texto ?? '').trim()
+  if (!limpio || limpio === SIN_DATO) return ''
+  if (esFechaIso(limpio)) return limpio
+
+  // Convierte lo inequívoco (año primero); lo ambiguo devuelve null a propósito.
+  return aFechaIso(limpio)
+}
+
+/**
+ * Control interactivo de fecha con botón de apertura, hoy y limpiar.
+ */
+function ControlFecha({
+  id,
+  valor,
+  onCambiar,
+  clase,
+  invalido,
+  describedBy,
+  requerido,
+  ph,
+}) {
+  const inputRef = useRef(null)
+  const valorIso = valorParaCalendario(valor)
+  const esIlegible = valorIso === null
+
+  const fijarHoy = () => {
+    const hoy = new Date()
+    const y = hoy.getFullYear()
+    const m = String(hoy.getMonth() + 1).padStart(2, '0')
+    const d = String(hoy.getDate()).padStart(2, '0')
+    onCambiar(`${y}-${m}-${d}`)
+  }
+
+  const limpiar = () => {
+    onCambiar('')
+  }
+
+  const abrirCalendario = () => {
+    if (!inputRef.current) return
+    if (typeof inputRef.current.showPicker === 'function') {
+      try {
+        inputRef.current.showPicker()
+      } catch {
+        inputRef.current.focus()
+      }
+    } else {
+      inputRef.current.focus()
+    }
+  }
+
+  if (esIlegible) {
+    return (
+      <div className="flex flex-col gap-1">
+        <input
+          id={id}
+          type="text"
+          value={valor ?? ''}
+          onChange={(e) => onCambiar(e.target.value)}
+          placeholder={ph ?? 'AAAA-MM-DD'}
+          title="Formato no reconocido. Escríbala como AAAA-MM-DD."
+          required={requerido}
+          aria-invalid={invalido || undefined}
+          aria-describedby={describedBy}
+          className={clase}
+        />
+        <div className="flex items-center gap-2 text-[11px] text-amber-700">
+          <span>Formato no estándar.</span>
+          <button
+            type="button"
+            onClick={fijarHoy}
+            className="font-semibold underline hover:text-amber-900"
+          >
+            Fijar hoy
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="relative flex items-center">
+        <input
+          ref={inputRef}
+          id={id}
+          type="date"
+          value={valorIso}
+          onChange={(e) => onCambiar(e.target.value)}
+          required={requerido}
+          aria-invalid={invalido || undefined}
+          aria-describedby={describedBy}
+          className={`${clase} cursor-pointer pr-9 [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-9 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer`}
+        />
+        {/*
+          Fuera del orden de tabulación y oculto para lectores de pantalla: el
+          propio <input type="date"> ya es accesible por teclado, y anunciar dos
+          controles para la misma fecha sobra. Pero SÍ debe poder pulsarse con el
+          ratón, que es para lo que existe; con `pointer-events-none` el clic no
+          llegaba nunca y `abrirCalendario` era código muerto.
+        */}
+        <button
+          type="button"
+          onClick={abrirCalendario}
+          title="Abrir selector de fecha"
+          tabIndex={-1}
+          aria-hidden="true"
+          className="absolute right-2.5 flex items-center justify-center text-gray-500 transition hover:text-blue-600 focus:outline-none"
+        >
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 9v7.5"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <div className="flex items-center gap-1.5 text-xs">
+        <button
+          type="button"
+          onClick={fijarHoy}
+          className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 hover:bg-blue-100 transition"
+          title="Fijar la fecha de hoy"
+        >
+          Hoy
+        </button>
+        {valorIso ? (
+          <button
+            type="button"
+            onClick={limpiar}
+            className="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600 hover:bg-gray-200 transition"
+            title="Quitar fecha"
+          >
+            Limpiar
+          </button>
+        ) : null}
+      </div>
+    </div>
+  )
+}
 
 /**
  * @param {Object} props
@@ -69,7 +236,6 @@ function CampoFicha({
         <option value="">— Seleccione —</option>
         {lista.map((opcion) => (
           <option key={opcion} value={opcion}>
-            {/* Se marca lo que no estaba previsto, para que se note y se pueda corregir. */}
             {opcion === ajeno ? `${opcion} (valor actual)` : opcion}
           </option>
         ))}
@@ -77,21 +243,27 @@ function CampoFicha({
     )
   }
 
-  // Un calendario solo acepta AAAA-MM-DD; con cualquier otra cosa se pinta
-  // VACÍO y el dato se pierde al guardar. Una fecha venida de una hoja de
-  // cálculo puede llegar como «9/22/26», así que si no se reconoce el formato
-  // se degrada a casilla de texto: se ve, se puede corregir y no se pierde.
-  const fechaIlegible = tipo === 'date' && valor && !esFechaIso(valor)
+  if (tipo === 'date') {
+    return (
+      <ControlFecha
+        id={id}
+        valor={valor}
+        onCambiar={onCambiar}
+        clase={clase}
+        invalido={invalido}
+        describedBy={describedBy}
+        requerido={requerido}
+        ph={ph}
+      />
+    )
+  }
 
   return (
     <input
       {...comunes}
-      // Un campo numérico no debe rechazar «No registrado» en una ficha a medio
-      // diligenciar: se deja el teclado numérico sin bloquear el texto.
-      type={tipo === 'number' || fechaIlegible ? 'text' : tipo}
+      type={tipo === 'number' ? 'text' : tipo}
       inputMode={tipo === 'number' ? 'numeric' : undefined}
-      placeholder={fechaIlegible ? 'AAAA-MM-DD' : (ph ?? undefined)}
-      title={fechaIlegible ? 'Formato no reconocido. Escríbala como AAAA-MM-DD.' : undefined}
+      placeholder={ph ?? undefined}
       required={requerido}
       className={clase}
     />

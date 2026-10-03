@@ -118,8 +118,58 @@ export const limpiar = (valor) =>
  */
 export const CAMPOS_FECHA = new Set(['fechaUltimaIntervencion', 'proximoMantenimiento'])
 
-/** ¿El texto ya está en el formato que entiende el calendario? */
-export const esFechaIso = (valor) => /^\d{4}-\d{2}-\d{2}$/.test(String(valor ?? '').trim())
+/**
+ * ¿El texto está en el formato que entiende el calendario Y existe en el
+ * calendario?
+ *
+ * La forma no basta: «2026-22-09» cumple el patrón pero no hay un mes 22, y un
+ * `<input type="date">` que recibe eso se pinta VACÍO. Comprobar solo el patrón
+ * dejaba pasar justo los valores que hacen desaparecer el dato.
+ */
+export function esFechaIso(valor) {
+  const texto = String(valor ?? '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(texto)) return false
+
+  const [anio, mes, dia] = texto.split('-').map(Number)
+  const fecha = new Date(anio, mes - 1, dia)
+
+  // Si el día o el mes se desbordan, Date rueda al siguiente: 2026-02-31 pasa a
+  // ser el 3 de marzo. Comparar las tres partes delata ese ajuste silencioso.
+  return (
+    fecha.getFullYear() === anio && fecha.getMonth() === mes - 1 && fecha.getDate() === dia
+  )
+}
+
+/**
+ * Texto de fecha convertido a `AAAA-MM-DD`, o null si no se puede afirmar.
+ *
+ * Solo convierte lo INEQUÍVOCO:
+ *
+ *   - Ya en ISO (`2026-09-23`).
+ *   - Año primero con otros separadores (`2026/09/23`): un bloque de cuatro
+ *     dígitos al inicio solo puede ser el año, y no existe la convención
+ *     AAAA/DD/MM.
+ *
+ * Lo demás NO se adivina. «3/4/2026» puede ser el 3 de abril o el 4 de marzo
+ * según el idioma del equipo que generó la hoja, y convertirlo al azar corrompe
+ * el dato sin que nadie lo note. Quien llame decide qué hacer con el null; la
+ * interfaz muestra el texto para que la persona lo corrija.
+ *
+ * @param {string} texto
+ * @returns {string|null}
+ */
+export function aFechaIso(texto) {
+  const limpio = String(texto ?? '').trim()
+  if (!limpio) return null
+
+  const partes = /^(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})$/.exec(limpio)
+  if (!partes) return null
+
+  const [, anio, mes, dia] = partes
+  const iso = `${anio}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`
+
+  return esFechaIso(iso) ? iso : null
+}
 
 /**
  * Fecha de una celda, en formato `AAAA-MM-DD` cuando se puede afirmar.
