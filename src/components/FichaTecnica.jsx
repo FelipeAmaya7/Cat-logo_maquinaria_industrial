@@ -5,6 +5,7 @@ import { GRUPOS_RESUELTOS } from "../data/gruposFicha";
 import { descargarFichaExcel } from "../servicios/exportarExcel";
 import { descargarFichaHtml } from "../servicios/exportarHtml";
 import { TIPOS_IMAGEN, prepararFotografia } from "../servicios/imagen";
+import CampoFicha from "./CampoFicha";
 import { DistintivoSistema } from "./IconoSistema";
 
 /** Marcador que usa el extractor cuando el formato venía sin diligenciar. */
@@ -533,7 +534,10 @@ function FichaTecnica({ maquina, onInicio, onGuardar, onEliminar }) {
                   Datos de identificación y operación del equipo
                 </caption>
                 <tbody>
-                  {CAMPOS.map(({ campo, rotulo, tipo }) => (
+                  {CAMPOS.map((definicion) => {
+                    const { campo, rotulo } = definicion
+
+                    return (
                     <tr key={campo} className="border-b border-gray-300">
                       <th
                         scope="row"
@@ -548,19 +552,16 @@ function FichaTecnica({ maquina, onInicio, onGuardar, onEliminar }) {
                       <td className="py-2 align-top text-sm text-gray-700">
                         {editando ? (
                           <>
-                            <input
+                            <CampoFicha
+                              definicion={definicion}
                               id={`campo-${campo}`}
-                              type="text"
-                              inputMode={tipo ? "numeric" : undefined}
-                              value={borrador[campo]}
-                              onChange={(evento) =>
-                                actualizar(campo, evento.target.value)
-                              }
-                              aria-invalid={Boolean(errores[campo])}
-                              aria-describedby={
+                              valor={borrador[campo]}
+                              onCambiar={(valor) => actualizar(campo, valor)}
+                              clase={claseCampo(Boolean(errores[campo]))}
+                              invalido={Boolean(errores[campo])}
+                              describedBy={
                                 errores[campo] ? `error-${campo}` : undefined
                               }
-                              className={claseCampo(Boolean(errores[campo]))}
                             />
                             <ErrorCampo
                               campo={campo}
@@ -572,7 +573,8 @@ function FichaTecnica({ maquina, onInicio, onGuardar, onEliminar }) {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -589,7 +591,10 @@ function FichaTecnica({ maquina, onInicio, onGuardar, onEliminar }) {
 
           {/* Campos de texto extenso */}
           <div className="grid grid-cols-1 gap-5 border-t border-gray-300 px-5 py-5 sm:grid-cols-3">
-            {BLOQUES.map(({ campo, rotulo }) => (
+            {BLOQUES.map((definicion) => {
+              const { campo, rotulo } = definicion
+
+              return (
               <div key={campo}>
                 <h4 className="border-b border-gray-300 pb-2 text-[11px] font-bold uppercase tracking-wide text-gray-800">
                   <label htmlFor={editando ? `campo-${campo}` : undefined}>
@@ -598,18 +603,17 @@ function FichaTecnica({ maquina, onInicio, onGuardar, onEliminar }) {
                 </h4>
                 {editando ? (
                   <>
-                    <textarea
+                    <CampoFicha
+                      definicion={definicion}
                       id={`campo-${campo}`}
-                      rows={4}
-                      value={borrador[campo]}
-                      onChange={(evento) =>
-                        actualizar(campo, evento.target.value)
-                      }
-                      aria-invalid={Boolean(errores[campo])}
-                      aria-describedby={
+                      valor={borrador[campo]}
+                      onCambiar={(valor) => actualizar(campo, valor)}
+                      clase={`mt-2 ${claseCampo(Boolean(errores[campo]))}`}
+                      invalido={Boolean(errores[campo])}
+                      describedBy={
                         errores[campo] ? `error-${campo}` : undefined
                       }
-                      className={`mt-2 ${claseCampo(Boolean(errores[campo]))} resize-y leading-relaxed`}
+                      filas={4}
                     />
                     <ErrorCampo campo={campo} mensaje={errores[campo]} />
                   </>
@@ -619,7 +623,8 @@ function FichaTecnica({ maquina, onInicio, onGuardar, onEliminar }) {
                   </p>
                 )}
               </div>
-            ))}
+              )
+            })}
           </div>
 
           {/* Pie de documento */}

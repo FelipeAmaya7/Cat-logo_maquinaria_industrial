@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { SIN_DATO, normalizarClave } from '../servicios/anclajeRotulos'
 import { GRUPOS_RESUELTOS, REQUERIDOS } from '../data/gruposFicha'
 import { TIPOS_IMAGEN, prepararFotografia } from '../servicios/imagen'
+import CampoFicha from './CampoFicha'
 
 /** Todos los campos, en plano, para inicializar y recoger el borrador. */
 const CAMPOS = GRUPOS_RESUELTOS.flatMap((grupo) => grupo.campos)
@@ -74,53 +75,20 @@ function FormularioFicha({ idsUsados, onGuardar, onCerrar }) {
 
   /**
    * Pinta el control que corresponde al campo de maquinaria.
+   * La decisión de QUÉ control toca vive en `CampoFicha`, compartido con el
+   * modo edición de la ficha; aquí solo se le pasan los datos y las clases.
    */
-  const control = ({ campo, tipo, ph, opciones, requerido }) => {
-    const id = `ficha-${campo}`
-    const clase = errores[campo] ? CAMPO_INVALIDO : CAMPO
-    const comunes = {
-      id,
-      value: borrador[campo],
-      onChange: (evento) => actualizar(campo, evento.target.value),
-    }
-
-    if (tipo === 'area') {
-      return (
-        <textarea
-          {...comunes}
-          rows={3}
-          placeholder={ph ?? undefined}
-          className={`${clase} resize-y leading-relaxed`}
-        />
-      )
-    }
-
-    if (tipo === 'select') {
-      return (
-        <select {...comunes} className={clase}>
-          <option value="">— Seleccione —</option>
-          {opciones.map((opcion) => (
-            <option key={opcion} value={opcion}>
-              {opcion}
-            </option>
-          ))}
-        </select>
-      )
-    }
-
-    return (
-      <input
-        {...comunes}
-        type={tipo === 'number' ? 'text' : tipo}
-        placeholder={ph ?? undefined}
-        required={requerido}
-        // Un campo numérico no debe rechazar «NO APLICA» en una ficha a medio
-        // diligenciar: se deja el teclado numérico sin bloquear el texto.
-        inputMode={tipo === 'number' ? 'numeric' : undefined}
-        className={clase}
-      />
-    )
-  }
+  const control = (definicion) => (
+    <CampoFicha
+      definicion={definicion}
+      id={`ficha-${definicion.campo}`}
+      valor={borrador[definicion.campo]}
+      onCambiar={(valor) => actualizar(definicion.campo, valor)}
+      clase={errores[definicion.campo] ? CAMPO_INVALIDO : CAMPO}
+      invalido={Boolean(errores[definicion.campo])}
+      describedBy={errores[definicion.campo] ? `error-ficha-${definicion.campo}` : undefined}
+    />
+  )
 
   const guardar = () => {
     const problemas = {}
@@ -270,7 +238,10 @@ function FormularioFicha({ idsUsados, onGuardar, onCerrar }) {
                       {control(definicion)}
 
                       {errores[definicion.campo] && (
-                        <p className="pt-1 text-[11px] text-red-600">
+                        <p
+                          id={`error-ficha-${definicion.campo}`}
+                          className="pt-1 text-[11px] text-red-600"
+                        >
                           {errores[definicion.campo]}
                         </p>
                       )}
