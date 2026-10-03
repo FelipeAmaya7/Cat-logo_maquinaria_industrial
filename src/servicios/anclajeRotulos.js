@@ -24,7 +24,12 @@
  *      de repuestos) repiten palabras como "MARCA" y contaminarían el dato.
  */
 
-/** Campo del modelo -> rótulo tal como aparece en el formato de planta. */
+/**
+ * Campo del modelo -> rótulo tal como aparece en el formato de planta y gestión.
+ *
+ * Enfocado 100% en maquinaria industrial de planta (empaques, corrugados y maquinaria gráfica).
+ * Los rótulos oficiales permiten la importación y exportación bidireccional en Excel.
+ */
 export const MAPA_CAMPOS = {
   placaNueva: 'PLACA NUEVA',
   placaPadre: 'PLACAPADRE',
@@ -45,11 +50,27 @@ export const MAPA_CAMPOS = {
   marca: 'MARCA',
   modelo: 'MODELO',
   serie: 'SERIE',
+  numeroMotor: 'NÚMERO DE MOTOR',
   turnoPorDia: 'TURNO POR DÍA',
   especificaciones: 'ESPECIFICACIONES',
   funcion: 'FUNCIÓN QUE PRESTA',
   materialProcesado: 'MATERIAL PROCESADO',
   capacidad: 'CAPACIDAD PRODUCTIVA',
+  precio: 'PRECIO',
+  anioInstalacion: 'AÑO INSTALACIÓN',
+  responsable: 'RESPONSABLE',
+  longitud: 'LONGITUD (M)',
+  ancho: 'ANCHO (M)',
+  alto: 'ALTO (M)',
+  pesoVacio: 'PESO VACÍO (KG)',
+  pesoBruto: 'PESO BRUTO (KG)',
+  fechaUltimaIntervencion: 'FECHA ÚLTIMA INTERVENCIÓN',
+  proximoMantenimiento: 'PRÓXIMO MANTENIMIENTO PROGRAMADO',
+  manualTecnico: 'MANUAL TÉCNICO',
+  vigenciaGarantia: 'VIGENCIA GARANTÍA',
+  intervenciones: 'INTERVENCIONES',
+  modificaciones: 'MODIFICACIONES',
+  actualizaciones: 'ACTUALIZACIONES',
 }
 
 /** Marcadores que en el formato significan "campo sin diligenciar". */

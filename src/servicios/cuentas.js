@@ -24,6 +24,7 @@ const CLAVE_SESION = 'sesion'
 const CLAVE_CATALOGO = 'catalogo'
 const CLAVE_EDICIONES = 'ediciones'
 const CLAVE_PROPIAS = 'maquinas-propias'
+const CLAVE_ORDENES = 'ordenes-trabajo'
 const CLAVE_VERSION = 'version-catalogo'
 
 /** Cuenta precargada la primera vez que se abre la aplicación. */
@@ -294,4 +295,175 @@ export function guardarEdicion(usuario, idMaquina, cambios) {
   }
 
   return { ok: escribir(clave, ediciones), ediciones }
+}
+
+/**
+ * Elimina una máquina del catálogo del usuario.
+ *
+ * Según su origen hay que tocar sitios distintos: las fichas que el usuario
+ * cargó viven completas en su lista, mientras que las del libro oficial solo
+ * están referenciadas por identificador. Se limpia también su parche de
+ * edición, que si no quedaría huérfano ocupando espacio.
+ *
+ * @param {string} usuario
+ * @param {string} idMaquina
+ * @returns {{ok: boolean, error?: string, maquinas?: Object[], ids?: string[]}}
+ */
+export function eliminarMaquina(usuario, idMaquina) {
+  const nombre = normalizar(usuario)
+  const clavePropias = `${CLAVE_PROPIAS}:${nombre}`
+  const claveCatalogo = `${CLAVE_CATALOGO}:${nombre}`
+  const claveEdiciones = `${CLAVE_EDICIONES}:${nombre}`
+
+  const propias = leer(clavePropias, []).filter((maquina) => maquina.id !== idMaquina)
+  const ids = leer(claveCatalogo, []).filter((id) => id !== idMaquina)
+
+  if (!escribir(clavePropias, propias) || !escribir(claveCatalogo, ids)) {
+    return { ok: false, error: 'No se pudo eliminar la ficha en este navegador.' }
+  }
+
+  const ediciones = leer(claveEdiciones, {})
+  if (ediciones[idMaquina]) {
+    delete ediciones[idMaquina]
+    escribir(claveEdiciones, ediciones)
+  }
+
+  return { ok: true, maquinas: propias, ids }
+}
+
+/**
+ * Órdenes de trabajo del usuario.
+ * Se guardan completas, como las fichas propias: no existen en ningún otro sitio.
+ *
+ * @param {string} usuario
+ * @returns {Object[]}
+ */
+export function ordenesDeUsuario(usuario) {
+  return leer(`${CLAVE_ORDENES}:${normalizar(usuario)}`, [])
+}
+
+/**
+ * Crea o actualiza una orden de trabajo.
+ * El identificador interno la distingue del «N° de orden», que la persona puede
+ * cambiar: dos órdenes podrían acabar con el mismo número por un error de
+ * digitación y aun así deben seguir siendo registros distintos.
+ *
+ * @param {string} usuario
+ * @param {Object} orden
+ * @returns {{ok: boolean, error?: string, ordenes?: Object[]}}
+ */
+export function guardarOrden(usuario, orden) {
+  const clave = `${CLAVE_ORDENES}:${normalizar(usuario)}`
+  const ordenes = leer(clave, [])
+
+  const posicion = ordenes.findIndex((existente) => existente.ref === orden.ref)
+  const siguientes =
+    posicion >= 0
+      ? ordenes.map((existente, i) => (i === posicion ? orden : existente))
+      : [...ordenes, orden]
+
+  if (!escribir(clave, siguientes)) {
+    return {
+      ok: false,
+      error: 'No se pudo guardar: el almacenamiento del navegador está lleno o bloqueado.',
+    }
+  }
+
+  return { ok: true, ordenes: siguientes, actualizada: posicion >= 0 }
+}
+
+/**
+ * Elimina una orden de trabajo por su identificador interno.
+ *
+ * @param {string} usuario
+ * @param {string} ref
+ * @returns {{ok: boolean, error?: string, ordenes?: Object[]}}
+ */
+export function eliminarOrden(usuario, ref) {
+  const clave = `${CLAVE_ORDENES}:${normalizar(usuario)}`
+  const ordenes = leer(clave, []).filter((orden) => orden.ref !== ref)
+
+  if (!escribir(clave, ordenes)) {
+    return { ok: false, error: 'No se pudo eliminar la orden en este navegador.' }
+  }
+
+  return { ok: true, ordenes }
+}
+
+/**
+ * Siguiente número de orden: el mayor registrado más uno.
+ *
+ * No se usa `longitud + 1` —como hace el proyecto de referencia— porque al
+ * borrar una orden ese cálculo repite un número ya usado.
+ *
+ * @param {Object[]} ordenes
+ * @returns {number}
+ */
+export function siguienteNumeroOrden(ordenes) {
+  const numeros = ordenes.map((orden) => Number(orden.numero)).filter(Number.isFinite)
+  return numeros.length === 0 ? 1 : Math.max(...numeros) + 1
+}
+
+/**
+ * Vacía el catálogo y las órdenes del usuario, dejando la cuenta intacta.
+ *
+ * Equivale al «Vaciar y empezar de nuevo» del proyecto de referencia, con una
+ * diferencia importante: allí los datos solo viven en memoria y se pierden al
+ * cerrar la pestaña, así que vaciar es inofensivo. Aquí SÍ están guardados, por
+ * lo que la interfaz debe confirmar antes de llamar a esta función.
+ *
+ * @param {string} usuario
+ * @returns {{ok: boolean, error?: string}}
+ */
+export function vaciarDatosDeUsuario(usuario) {
+  const nombre = normalizar(usuario)
+
+  const escrituras = [
+    escribir(`${CLAVE_CATALOGO}:${nombre}`, []),
+    escribir(`${CLAVE_PROPIAS}:${nombre}`, []),
+    escribir(`${CLAVE_ORDENES}:${nombre}`, []),
+    escribir(`${CLAVE_EDICIONES}:${nombre}`, {}),
+  ]
+
+  if (escrituras.some((correcta) => !correcta)) {
+    return { ok: false, error: 'No se pudo vaciar el almacenamiento de este navegador.' }
+  }
+
+  return { ok: true }
+}
+
+/**
+ * Incorpora de una vez las máquinas y órdenes leídas de un libro de Excel.
+ * Las fichas cuya placa ya exista se omiten, para no duplicar el inventario
+ * al volver a cargar un archivo exportado antes.
+ *
+ * @param {string} usuario
+ * @param {{maquinas: Object[], ordenes: Object[]}} contenido
+ * @returns {{ok: boolean, error?: string, maquinas?: Object[], ordenes?: Object[], omitidas?: number}}
+ */
+export function importarLibro(usuario, { maquinas = [], ordenes = [] }) {
+  const nombre = normalizar(usuario)
+  const clavePropias = `${CLAVE_PROPIAS}:${nombre}`
+  const claveOrdenes = `${CLAVE_ORDENES}:${nombre}`
+
+  const propias = leer(clavePropias, [])
+  const existentes = new Set([...propias.map((m) => m.id), ...leer(`${CLAVE_CATALOGO}:${nombre}`, [])])
+
+  const nuevas = maquinas.filter((maquina) => !existentes.has(maquina.id))
+  const siguientesPropias = [...propias, ...nuevas]
+  const siguientesOrdenes = [...leer(claveOrdenes, []), ...ordenes]
+
+  if (!escribir(clavePropias, siguientesPropias) || !escribir(claveOrdenes, siguientesOrdenes)) {
+    return {
+      ok: false,
+      error: 'No se pudo guardar: el almacenamiento del navegador está lleno o bloqueado.',
+    }
+  }
+
+  return {
+    ok: true,
+    maquinas: siguientesPropias,
+    ordenes: siguientesOrdenes,
+    omitidas: maquinas.length - nuevas.length,
+  }
 }

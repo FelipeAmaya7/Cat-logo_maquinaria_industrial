@@ -41,3 +41,7 @@ dist-ssr
 # Artefactos de despliegue
 .cache/
 node_modules/.vite/
+
+# Catálogos HTML generados por "npm run html"
+catalogo-maquinaria.html
+catalogo-maquinaria-completo.html
