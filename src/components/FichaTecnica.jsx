@@ -6,6 +6,7 @@ import { descargarFichaExcel } from "../servicios/exportarExcel";
 import { descargarFichaHtml } from "../servicios/exportarHtml";
 import { TIPOS_IMAGEN, prepararFotografia } from "../servicios/imagen";
 import CampoFicha from "./CampoFicha";
+import HistorialRepuestos from "./HistorialRepuestos";
 import { DistintivoSistema } from "./IconoSistema";
 
 /** Marcador que usa el extractor cuando el formato venía sin diligenciar. */
@@ -302,7 +303,15 @@ function renderValorLectura(definicion, valor) {
  * @param {(maquina: Object) => void} props.onEliminar  Quita la ficha del catálogo.
  *        Persiste los valores editables. Devuelve false si no se pudo guardar.
  */
-function FichaTecnica({ maquina, onInicio, onGuardar, onEliminar }) {
+function FichaTecnica({
+  maquina,
+  onInicio,
+  onGuardar,
+  onEliminar,
+  repuestos = [],
+  onGuardarRepuesto,
+  onEliminarRepuesto,
+}) {
   const [confirmandoBorrado, setConfirmandoBorrado] = useState(false);
   const [borrador, setBorrador] = useState(null);
   const [errores, setErrores] = useState({});
@@ -321,7 +330,7 @@ function FichaTecnica({ maquina, onInicio, onGuardar, onEliminar }) {
    */
   const descargar = async () => {
     setDescargando(true);
-    const resultado = await descargarFichaExcel(maquina);
+    const resultado = await descargarFichaExcel(maquina, { repuestos });
     setDescargando(false);
 
     if (!resultado.ok) setError(resultado.error);
@@ -668,6 +677,20 @@ function FichaTecnica({ maquina, onInicio, onGuardar, onEliminar }) {
               )
             })}
           </div>
+
+          {/*
+            El historial NO es un campo de la ficha: es una colección aparte, así
+            que se añade un repuesto sin entrar en modo edición. Por eso está
+            fuera del bloque que depende de `editando`.
+          */}
+          {onGuardarRepuesto && (
+            <HistorialRepuestos
+              entradas={repuestos}
+              idMaquina={maquina.id}
+              onGuardar={onGuardarRepuesto}
+              onEliminar={onEliminarRepuesto}
+            />
+          )}
 
           {/* Pie de documento */}
           <footer className="grid grid-cols-1 border-t border-gray-300 bg-gray-50 text-[11px] uppercase tracking-wide text-gray-600 sm:grid-cols-3">

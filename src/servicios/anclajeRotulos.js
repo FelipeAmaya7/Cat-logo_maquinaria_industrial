@@ -59,6 +59,15 @@ export const MAPA_CAMPOS = {
   precio: 'PRECIO',
   anioInstalacion: 'AÑO INSTALACIÓN',
   responsable: 'RESPONSABLE',
+  // Quién opera la máquina. Los rótulos son de varias palabras a propósito: el
+  // algoritmo trata cualquier rótulo conocido como frontera de un valor, así
+  // que uno de una sola palabra («OPERADOR», «CARGO») podría coincidir con el
+  // contenido de una celda del libro de planta y partir el dato de al lado.
+  operadorAsignado: 'OPERADOR ASIGNADO',
+  cargoOperador: 'CARGO DEL OPERADOR',
+  identificacionOperador: 'IDENTIFICACIÓN DEL OPERADOR',
+  turnoOperador: 'TURNO DEL OPERADOR',
+  descripcionOperador: 'DESCRIPCIÓN DEL OPERADOR',
   longitud: 'LONGITUD (M)',
   ancho: 'ANCHO (M)',
   alto: 'ALTO (M)',

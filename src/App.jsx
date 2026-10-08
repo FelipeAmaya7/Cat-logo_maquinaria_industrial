@@ -13,6 +13,7 @@ import { filtrarMaquinas } from './data/maquinas'
 import { obtenerMaquinasPorId } from './data/catalogo'
 import { INSTITUCION } from './data/institucion'
 import { MAPA_CAMPOS } from './servicios/anclajeRotulos'
+import { repuestosDeMaquina } from './data/repuestos'
 import { descargarCatalogoExcel } from './servicios/exportarExcel'
 import { descargarCatalogoHtml } from './servicios/exportarHtml'
 import {
@@ -28,6 +29,9 @@ import {
   maquinasDeUsuario,
   maquinasPropias,
   ordenesDeUsuario,
+  repuestosDeUsuario,
+  guardarRepuesto,
+  eliminarRepuesto,
   guardarOrden,
   siguienteNumeroOrden,
   sembrarDatosIniciales,
@@ -71,6 +75,7 @@ function App() {
   // { texto, error }: un mismo recuadro sirve para confirmar y para avisar de un fallo.
   const [aviso, setAviso] = useState({ texto: '', error: false })
   const [ordenes, setOrdenes] = useState([])
+  const [repuestos, setRepuestos] = useState([])
   const [creandoFicha, setCreandoFicha] = useState(false)
   const [ordenEnEdicion, setOrdenEnEdicion] = useState(null)
   const [ordenDesplegada, setOrdenDesplegada] = useState(null)
@@ -89,6 +94,7 @@ function App() {
     setEdiciones(nuevaSesion ? leerEdiciones(nuevaSesion.usuario) : {})
     setPropias(nuevaSesion ? maquinasPropias(nuevaSesion.usuario) : [])
     setOrdenes(nuevaSesion ? ordenesDeUsuario(nuevaSesion.usuario) : [])
+    setRepuestos(nuevaSesion ? repuestosDeUsuario(nuevaSesion.usuario) : [])
     setAviso({ texto: '', error: false })
   }
 
@@ -104,6 +110,7 @@ function App() {
       setEdiciones(persistida ? leerEdiciones(persistida.usuario) : {})
       setPropias(persistida ? maquinasPropias(persistida.usuario) : [])
       setOrdenes(persistida ? ordenesDeUsuario(persistida.usuario) : [])
+      setRepuestos(persistida ? repuestosDeUsuario(persistida.usuario) : [])
       setListo(true)
     })
 
@@ -241,7 +248,11 @@ function App() {
   /** Exporta a .xlsx el catálogo completo del usuario, con sus ediciones. */
   const exportarCatalogo = async () => {
     setExportando(true)
-    const resultado = await descargarCatalogoExcel(catalogoUsuario, { usuario: sesion.usuario, ordenes })
+    const resultado = await descargarCatalogoExcel(catalogoUsuario, {
+      usuario: sesion.usuario,
+      ordenes,
+      repuestos,
+    })
     setExportando(false)
 
     setAviso(
@@ -306,6 +317,36 @@ function App() {
         : `Orden N° ${orden.numero} registrada.`,
     )
     return { ok: true }
+  }
+
+  /**
+   * Crea o actualiza una entrada del historial de repuestos.
+   * Devuelve el resultado en vez de solo avisar, porque el formulario vive
+   * dentro de la ficha y necesita saber si cerrarse o mantener lo escrito.
+   */
+  const aplicarRepuesto = (repuesto) => {
+    const resultado = guardarRepuesto(sesion.usuario, repuesto)
+    if (!resultado.ok) return resultado
+
+    setRepuestos(resultado.repuestos)
+    informar(
+      resultado.actualizada
+        ? `Repuesto «${repuesto.repuesto}» actualizado.`
+        : `Repuesto «${repuesto.repuesto}» añadido al historial.`,
+    )
+    return { ok: true }
+  }
+
+  /** Elimina una entrada del historial de repuestos. */
+  const quitarRepuesto = (repuesto) => {
+    const resultado = eliminarRepuesto(sesion.usuario, repuesto.ref)
+    if (!resultado.ok) {
+      informar(resultado.error, true)
+      return
+    }
+
+    setRepuestos(resultado.repuestos)
+    informar(`Repuesto «${repuesto.repuesto}» quitado del historial.`)
   }
 
   /** Elimina una orden de trabajo. */
@@ -412,6 +453,9 @@ function App() {
             onInicio={volverAlCatalogo}
             onGuardar={aplicarEdicion}
             onEliminar={quitarFicha}
+            repuestos={repuestosDeMaquina(repuestos, maquinaSeleccionada.id)}
+            onGuardarRepuesto={aplicarRepuesto}
+            onEliminarRepuesto={quitarRepuesto}
           />
         ) : (
           <>

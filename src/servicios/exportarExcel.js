@@ -25,6 +25,7 @@
 import { MAPA_CAMPOS, SIN_DATO } from './anclajeRotulos'
 import { FICHA_TECNICA, ORDENES_DE_TRABAJO, REGISTRO_DE_DATOS } from './formatoCompanero'
 import { COLUMNAS_ORDEN } from '../data/ordenes'
+import { COLUMNAS_REPUESTO, costoTotal } from '../data/repuestos'
 
 /**
  * Carga `xlsx` BAJO DEMANDA, igual que el lector.
@@ -94,7 +95,7 @@ function sello() {
  * @param {Object} maquina Máquina ya con sus ediciones aplicadas.
  * @returns {Promise<{ok: boolean, error?: string, archivo?: string}>}
  */
-export async function descargarFichaExcel(maquina) {
+export async function descargarFichaExcel(maquina, { repuestos = [] } = {}) {
   if (!maquina) return { ok: false, error: 'No hay ficha que exportar.' }
 
   try {
@@ -113,6 +114,24 @@ export async function descargarFichaExcel(maquina) {
     const libro = xlsx.utils.book_new()
     // El nombre de hoja de Excel admite 31 caracteres y no acepta : \ / ? * [ ]
     xlsx.utils.book_append_sheet(libro, hoja, nombreSeguro(maquina.id).slice(0, 31) || 'Ficha')
+
+    // El historial va en una SEGUNDA hoja, nunca debajo de los rótulos: el
+    // lector ancla a rótulos sobre la primera hoja, y una tabla con
+    // encabezados como «Cantidad» ahí abajo podría confundirse con un campo
+    // de la ficha. En hoja aparte, el ciclo de ida y vuelta queda intacto.
+    if (repuestos.length > 0) {
+      const encabezado = COLUMNAS_REPUESTO.map(([, rotulo]) => rotulo)
+      const cuerpo = repuestos.map((entrada) =>
+        COLUMNAS_REPUESTO.map(([campo]) => String(entrada[campo] ?? '')),
+      )
+
+      const hojaRepuestos = xlsx.utils.aoa_to_sheet([encabezado, ...cuerpo])
+      hojaRepuestos['!cols'] = encabezado.map((rotulo) => ({
+        wch: Math.max(14, rotulo.length + 2),
+      }))
+      hojaRepuestos['!freeze'] = { xSplit: 0, ySplit: 1 }
+      xlsx.utils.book_append_sheet(libro, hojaRepuestos, 'Repuestos')
+    }
 
     const archivo = `ficha-${nombreSeguro(maquina.id)}.xlsx`
     xlsx.writeFile(libro, archivo)
@@ -162,9 +181,13 @@ function hojaTabular(xlsx, { columnas }, maquinas) {
  * @param {Object} [opciones]
  * @param {string} [opciones.usuario] Queda registrado en la hoja de resumen.
  * @param {Object[]} [opciones.ordenes] Órdenes de trabajo del usuario.
+ * @param {Object[]} [opciones.repuestos] Historial de repuestos del usuario.
  * @returns {Promise<{ok: boolean, error?: string, archivo?: string}>}
  */
-export async function descargarCatalogoExcel(maquinas, { usuario, ordenes = [] } = {}) {
+export async function descargarCatalogoExcel(
+  maquinas,
+  { usuario, ordenes = [], repuestos = [] } = {},
+) {
   if (!maquinas || maquinas.length === 0) {
     return { ok: false, error: 'No hay fichas que exportar.' }
   }
@@ -203,7 +226,30 @@ export async function descargarCatalogoExcel(maquinas, { usuario, ordenes = [] }
       FICHA_TECNICA.hoja,
     )
 
-    xlsx.utils.book_append_sheet(libro, hojaResumen(xlsx, maquinas, usuario, ordenes), 'Resumen')
+    // Historial de repuestos de todo el inventario. La columna «Equipo» lleva
+    // la placa, no el identificador interno, para que la hoja se lea sola.
+    const filasRepuestos = repuestos.map((entrada) =>
+      COLUMNAS_REPUESTO.map(([campo]) => {
+        if (campo !== 'idMaquina') return String(entrada[campo] ?? '')
+
+        const maquina = maquinas.find((m) => m.id === entrada.idMaquina)
+        return maquina ? maquina.placaNueva : String(entrada.idMaquina ?? '')
+      }),
+    )
+
+    const titulosRepuestos = COLUMNAS_REPUESTO.map(([, rotulo]) => rotulo)
+    const hojaRepuestos = xlsx.utils.aoa_to_sheet([titulosRepuestos, ...filasRepuestos])
+    hojaRepuestos['!cols'] = titulosRepuestos.map((rotulo) => ({
+      wch: Math.max(ANCHO_MINIMO, rotulo.length + 2),
+    }))
+    hojaRepuestos['!freeze'] = { xSplit: 0, ySplit: 1 }
+    xlsx.utils.book_append_sheet(libro, hojaRepuestos, 'Historial de repuestos')
+
+    xlsx.utils.book_append_sheet(
+      libro,
+      hojaResumen(xlsx, maquinas, usuario, ordenes, repuestos),
+      'Resumen',
+    )
 
     const archivo = `catalogo-maquinaria-${sello()}.xlsx`
     xlsx.writeFile(libro, archivo)
@@ -215,7 +261,7 @@ export async function descargarCatalogoExcel(maquinas, { usuario, ordenes = [] }
 }
 
 /** Hoja de portada con los conteos por estado y por ubicación. */
-function hojaResumen(xlsx, maquinas, usuario, ordenes = []) {
+function hojaResumen(xlsx, maquinas, usuario, ordenes = [], repuestos = []) {
   const contar = (campo) => {
     const conteo = new Map()
     for (const maquina of maquinas) {
@@ -233,6 +279,8 @@ function hojaResumen(xlsx, maquinas, usuario, ordenes = []) {
     ['Total de fichas', maquinas.length],
     ['Con fotografía', maquinas.filter((maquina) => maquina.imagen).length],
     ['Órdenes de trabajo', ordenes.length],
+    ['Repuestos registrados', repuestos.length],
+    ['Costo acumulado en repuestos', costoTotal(repuestos)],
     [],
     ['Por estado', 'Fichas'],
     ...contar('estado'),
