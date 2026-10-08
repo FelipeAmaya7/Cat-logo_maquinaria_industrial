@@ -25,6 +25,7 @@ const CLAVE_CATALOGO = 'catalogo'
 const CLAVE_EDICIONES = 'ediciones'
 const CLAVE_PROPIAS = 'maquinas-propias'
 const CLAVE_ORDENES = 'ordenes-trabajo'
+const CLAVE_REPUESTOS = 'repuestos'
 const CLAVE_VERSION = 'version-catalogo'
 
 /** Cuenta precargada la primera vez que se abre la aplicación. */
@@ -391,6 +392,67 @@ export function eliminarOrden(usuario, ref) {
 }
 
 /**
+ * Historial de repuestos del usuario, de TODAS sus máquinas.
+ *
+ * Se guarda en una sola lista y no una por máquina: así una ficha que se borra
+ * no se lleva el historial por delante, y exportar el libro completo es leer
+ * una única clave en vez de recorrer el catálogo.
+ *
+ * @param {string} usuario
+ * @returns {Object[]}
+ */
+export function repuestosDeUsuario(usuario) {
+  return leer(`${CLAVE_REPUESTOS}:${normalizar(usuario)}`, [])
+}
+
+/**
+ * Crea o actualiza una entrada del historial de repuestos.
+ * Se distingue por `ref`, no por fecha ni nombre: la misma pieza se cambia
+ * varias veces y dos cambios pueden caer el mismo día.
+ *
+ * @param {string} usuario
+ * @param {Object} repuesto
+ * @returns {{ok: boolean, error?: string, repuestos?: Object[], actualizada?: boolean}}
+ */
+export function guardarRepuesto(usuario, repuesto) {
+  const clave = `${CLAVE_REPUESTOS}:${normalizar(usuario)}`
+  const repuestos = leer(clave, [])
+
+  const posicion = repuestos.findIndex((existente) => existente.ref === repuesto.ref)
+  const siguientes =
+    posicion >= 0
+      ? repuestos.map((existente, i) => (i === posicion ? repuesto : existente))
+      : [...repuestos, repuesto]
+
+  if (!escribir(clave, siguientes)) {
+    return {
+      ok: false,
+      error: 'No se pudo guardar: el almacenamiento del navegador está lleno o bloqueado.',
+    }
+  }
+
+  return { ok: true, repuestos: siguientes, actualizada: posicion >= 0 }
+}
+
+/**
+ * Elimina una entrada del historial por su identificador interno.
+ *
+ * @param {string} usuario
+ * @param {string} ref
+ * @returns {{ok: boolean, error?: string, repuestos?: Object[]}}
+ */
+export function eliminarRepuesto(usuario, ref) {
+  const clave = `${CLAVE_REPUESTOS}:${normalizar(usuario)}`
+  const repuestos = leer(clave, []).filter((entrada) => entrada.ref !== ref)
+
+  if (!escribir(clave, repuestos)) {
+    return { ok: false, error: 'No se pudo eliminar el repuesto en este navegador.' }
+  }
+
+  return { ok: true, repuestos }
+}
+
+/**
  * Siguiente número de orden: el mayor registrado más uno.
  *
  * No se usa `longitud + 1` —como hace el proyecto de referencia— porque al
@@ -422,6 +484,7 @@ export function vaciarDatosDeUsuario(usuario) {
     escribir(`${CLAVE_CATALOGO}:${nombre}`, []),
     escribir(`${CLAVE_PROPIAS}:${nombre}`, []),
     escribir(`${CLAVE_ORDENES}:${nombre}`, []),
+    escribir(`${CLAVE_REPUESTOS}:${nombre}`, []),
     escribir(`${CLAVE_EDICIONES}:${nombre}`, {}),
   ]
 

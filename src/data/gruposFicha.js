@@ -18,6 +18,7 @@ export const EXTENSOS = new Set([
   'intervenciones',
   'modificaciones',
   'actualizaciones',
+  'descripcionOperador',
   'dimension',
 ])
 
@@ -71,6 +72,16 @@ export const GRUPOS = [
       'horasUso',
       'aniosUso',
       'responsable',
+    ],
+  },
+  {
+    titulo: 'Operador de la máquina',
+    campos: [
+      'operadorAsignado',
+      'cargoOperador',
+      'identificacionOperador',
+      'turnoOperador',
+      'descripcionOperador',
     ],
   },
   {

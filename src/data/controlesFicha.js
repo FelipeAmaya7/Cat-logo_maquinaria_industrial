@@ -35,7 +35,13 @@ export const CONTROLES = {
   capacidad: { tipo: "text", ph: "Ej. 5.000 cajas/hora, 150 m/min", etiqueta: "Capacidad productiva" },
   horasUso: { tipo: "text", ph: "Ej. 1200 horas (horómetro)", etiqueta: "Horas de uso" },
   aniosUso: { tipo: "number", ph: "5", etiqueta: "Años de uso" },
-  responsable: { tipo: "text", ph: "Ej. Ing. Carlos Rodríguez", etiqueta: "Responsable" },
+  responsable: { tipo: "text", ph: "Ej. Ing. Carlos Rodríguez", etiqueta: "Responsable del activo" },
+
+  operadorAsignado: { tipo: "text", ph: "Ej. Juan Pérez Gómez", etiqueta: "Operador asignado" },
+  cargoOperador: { tipo: "text", ph: "Ej. Operario de impresión flexográfica", etiqueta: "Cargo del operador" },
+  identificacionOperador: { tipo: "text", ph: "Ej. CC 1.045.882.331 o código interno", etiqueta: "Identificación / código" },
+  turnoOperador: { tipo: "text", ph: "Ej. Turno 1 (6:00 a 14:00)", etiqueta: "Turno del operador" },
+  descripcionOperador: { tipo: "area", ph: "Ej. Operario certificado en manejo de flexográfica desde 2021. Autorizado para calibrar rodillos y cambiar cuchillas. Requiere acompañamiento para el ajuste de registro.", etiqueta: "Descripción del operador" },
 
   material: { tipo: "text", ph: "Ej. Acero, Hierro fundido, Metal", etiqueta: "Material" },
   color: { tipo: "text", ph: "Ej. Verde industrial, Gris, Azul", etiqueta: "Color" },
