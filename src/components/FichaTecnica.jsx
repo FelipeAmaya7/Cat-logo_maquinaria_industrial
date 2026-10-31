@@ -44,7 +44,7 @@ const EDITABLES = [...CAMPOS, ...BLOQUES];
 const CAMPO_BASE =
   "w-full rounded border bg-white px-2 py-1 text-sm text-gray-800 outline-none transition focus:ring-2";
 const CAMPO_NORMAL =
-  "border-gray-300 focus:border-blue-500 focus:ring-blue-200";
+  "border-gray-300 focus:border-acento-500 focus:ring-acento-200";
 const CAMPO_INVALIDO = "border-red-500 focus:border-red-500 focus:ring-red-200";
 
 /** Clase del control según tenga o no un error de validación. */
@@ -180,12 +180,6 @@ function FotoTecnica({ maquina, editando, imagen, onCambiarImagen, onError }) {
         </div>
       )}
 
-      {maquina.imagenEsRespaldo && !editando && (
-        <p className="pt-2 text-[11px] leading-snug text-amber-700">
-          Imagen de referencia: esta ficha no tiene fotografía propia en el
-          formato original.
-        </p>
-      )}
     </figure>
   );
 }
@@ -262,7 +256,7 @@ function renderValorLectura(definicion, valor) {
     return (
       <span className="inline-flex items-center gap-1.5 font-medium text-gray-800">
         <svg
-          className="h-3.5 w-3.5 shrink-0 text-blue-600"
+          className="h-3.5 w-3.5 shrink-0 text-acento-600"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -498,7 +492,7 @@ function FichaTecnica({
                       key="editar"
                       type="button"
                       onClick={empezarEdicion}
-                      className="rounded-md border border-blue-600 bg-white px-4 py-2 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
+                      className="rounded-md border border-acento-600 bg-white px-4 py-2 text-sm font-semibold text-acento-700 shadow-sm transition hover:bg-acento-50 focus:outline-none focus:ring-2 focus:ring-acento-400 focus:ring-offset-2"
                     >
                       Editar información
                     </button>
@@ -506,7 +500,7 @@ function FichaTecnica({
                       key="inicio"
                       type="button"
                       onClick={onInicio}
-                      className="rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
+                      className="rounded-md bg-acento-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-acento-700 focus:outline-none focus:ring-2 focus:ring-acento-400 focus:ring-offset-2"
                     >
                       INICIO
                     </button>
@@ -553,9 +547,8 @@ function FichaTecnica({
           )}
 
           {editando && (
-            <p className="border-b border-blue-200 bg-blue-50 px-5 py-3 text-sm text-blue-800">
-              Modo edición. Los cambios se guardan solo para tu usuario en este
-              navegador.
+            <p className="border-b border-acento-200 bg-acento-50 px-5 py-3 text-sm text-acento-800">
+              Modo edición. Los cambios se guardan en este navegador.
             </p>
           )}
 
@@ -570,7 +563,7 @@ function FichaTecnica({
 
           {/* Identificación del activo */}
           <div className="flex flex-wrap items-center gap-3 border-b border-gray-300 bg-gray-50 px-5 py-3">
-            <span className="rounded bg-industrial-800 px-2.5 py-1 font-mono text-xs font-semibold text-white">
+            <span className="rounded bg-grafito-800 px-2.5 py-1 font-mono text-xs font-semibold text-white">
               {valorDe("placaNueva")}
             </span>
             <h3 className="text-sm font-bold text-gray-800">

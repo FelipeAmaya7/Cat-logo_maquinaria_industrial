@@ -23,7 +23,6 @@
  * los valores y no a su izquierda.
  */
 import { MAPA_CAMPOS, SIN_DATO } from './anclajeRotulos'
-import { FICHA_TECNICA, ORDENES_DE_TRABAJO, REGISTRO_DE_DATOS } from './formatoCompanero'
 import { COLUMNAS_ORDEN } from '../data/ordenes'
 import { COLUMNAS_REPUESTO, costoTotal } from '../data/repuestos'
 
@@ -33,6 +32,16 @@ import { COLUMNAS_REPUESTO, costoTotal } from '../data/repuestos'
  * un archivo no la descarga.
  */
 const cargarXlsx = () => import('xlsx')
+
+/**
+ * Hojas del libro.
+ *
+ * Antes reproducían la estructura de un proyecto de referencia externo. Ahora
+ * son las de este sistema: los equipos con su vocabulario y las órdenes de
+ * trabajo con el suyo.
+ */
+const HOJA_EQUIPOS = 'Equipos'
+const HOJA_ORDENES = 'Órdenes de trabajo'
 
 /** Campos del modelo, en el orden en que se escriben en la hoja. */
 const CAMPOS = Object.entries(MAPA_CAMPOS)
@@ -171,22 +180,21 @@ function hojaTabular(xlsx, { columnas }, maquinas) {
 }
 
 /**
- * Descarga el catálogo completo del usuario como libro .xlsx.
+ * Descarga el catálogo completo como libro .xlsx.
  *
  * Reproduce la disposición de tres hojas del proyecto de referencia
- * (ver `formatoCompanero.js`), más una hoja de resumen con los conteos del
+ * más una hoja de resumen con los conteos del
  * inventario.
  *
  * @param {Object[]} maquinas Catálogo ya con las ediciones aplicadas.
  * @param {Object} [opciones]
- * @param {string} [opciones.usuario] Queda registrado en la hoja de resumen.
- * @param {Object[]} [opciones.ordenes] Órdenes de trabajo del usuario.
- * @param {Object[]} [opciones.repuestos] Historial de repuestos del usuario.
+ * @param {Object[]} [opciones.ordenes] Órdenes de trabajo registradas.
+ * @param {Object[]} [opciones.repuestos] Historial de repuestos registrado.
  * @returns {Promise<{ok: boolean, error?: string, archivo?: string}>}
  */
 export async function descargarCatalogoExcel(
   maquinas,
-  { usuario, ordenes = [], repuestos = [] } = {},
+  { ordenes = [], repuestos = [] } = {},
 ) {
   if (!maquinas || maquinas.length === 0) {
     return { ok: false, error: 'No hay fichas que exportar.' }
@@ -198,8 +206,8 @@ export async function descargarCatalogoExcel(
 
     xlsx.utils.book_append_sheet(
       libro,
-      hojaTabular(xlsx, REGISTRO_DE_DATOS, maquinas),
-      REGISTRO_DE_DATOS.hoja,
+      hojaTabular(xlsx, { columnas: [['id', 'ID'], ...CAMPOS] }, maquinas),
+      HOJA_EQUIPOS,
     )
 
     // Las órdenes registradas. Sin ninguna, queda la plantilla con sus títulos.
@@ -213,18 +221,13 @@ export async function descargarCatalogoExcel(
       }),
     )
 
-    const hojaOrdenes = xlsx.utils.aoa_to_sheet([ORDENES_DE_TRABAJO.columnas, ...filasOrdenes])
-    hojaOrdenes['!cols'] = ORDENES_DE_TRABAJO.columnas.map((rotulo) => ({
+    const encabezadoOrdenes = COLUMNAS_ORDEN.map(([, rotulo]) => rotulo)
+    const hojaOrdenes = xlsx.utils.aoa_to_sheet([encabezadoOrdenes, ...filasOrdenes])
+    hojaOrdenes['!cols'] = encabezadoOrdenes.map((rotulo) => ({
       wch: Math.max(ANCHO_MINIMO, rotulo.length + 2),
     }))
     hojaOrdenes['!freeze'] = { xSplit: 0, ySplit: 1 }
-    xlsx.utils.book_append_sheet(libro, hojaOrdenes, ORDENES_DE_TRABAJO.hoja)
-
-    xlsx.utils.book_append_sheet(
-      libro,
-      hojaTabular(xlsx, FICHA_TECNICA, maquinas),
-      FICHA_TECNICA.hoja,
-    )
+    xlsx.utils.book_append_sheet(libro, hojaOrdenes, HOJA_ORDENES)
 
     // Historial de repuestos de todo el inventario. La columna «Equipo» lleva
     // la placa, no el identificador interno, para que la hoja se lea sola.
@@ -247,7 +250,7 @@ export async function descargarCatalogoExcel(
 
     xlsx.utils.book_append_sheet(
       libro,
-      hojaResumen(xlsx, maquinas, usuario, ordenes, repuestos),
+      hojaResumen(xlsx, maquinas, ordenes, repuestos),
       'Resumen',
     )
 
@@ -261,7 +264,7 @@ export async function descargarCatalogoExcel(
 }
 
 /** Hoja de portada con los conteos por estado y por ubicación. */
-function hojaResumen(xlsx, maquinas, usuario, ordenes = [], repuestos = []) {
+function hojaResumen(xlsx, maquinas, ordenes = [], repuestos = []) {
   const contar = (campo) => {
     const conteo = new Map()
     for (const maquina of maquinas) {
@@ -275,7 +278,6 @@ function hojaResumen(xlsx, maquinas, usuario, ordenes = [], repuestos = []) {
     ['Catálogo técnico de maquinaria'],
     [],
     ['Generado', new Date().toLocaleString('es-CO')],
-    ['Usuario', usuario ?? ''],
     ['Total de fichas', maquinas.length],
     ['Con fotografía', maquinas.filter((maquina) => maquina.imagen).length],
     ['Órdenes de trabajo', ordenes.length],

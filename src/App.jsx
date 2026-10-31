@@ -1,46 +1,57 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import Header from './components/Header'
+import { useEffect, useMemo, useState } from 'react'
+import BarraLateral from './components/BarraLateral'
+import { estaDisponible } from './servicios/almacenamiento'
 import Buscador from './components/Buscador'
 import ListaTarjetas from './components/ListaTarjetas'
 import FichaTecnica from './components/FichaTecnica'
-import Autenticacion from './components/Autenticacion'
 import SubirFicha from './components/SubirFicha'
 import FormularioFicha from './components/FormularioFicha'
 import FormularioOrden from './components/FormularioOrden'
 import ListaOrdenes from './components/ListaOrdenes'
-import { leerLibroCompleto } from './servicios/lectorLibro'
 import { filtrarMaquinas } from './data/maquinas'
 import { obtenerMaquinasPorId } from './data/catalogo'
-import { INSTITUCION } from './data/institucion'
 import { MAPA_CAMPOS } from './servicios/anclajeRotulos'
 import { repuestosDeMaquina } from './data/repuestos'
 import { descargarCatalogoExcel } from './servicios/exportarExcel'
 import { descargarCatalogoHtml } from './servicios/exportarHtml'
 import {
-  cerrarSesion,
   eliminarMaquina,
   eliminarOrden,
-  importarLibro,
-  vaciarDatosDeUsuario,
+  vaciarTodo,
   guardarEdicion,
   guardarMaquinaPropia,
   leerEdiciones,
-  leerSesion,
-  maquinasDeUsuario,
+  idsDelCatalogo,
   maquinasPropias,
-  ordenesDeUsuario,
-  repuestosDeUsuario,
+  leerOrdenes,
+  leerRepuestos,
   guardarRepuesto,
   eliminarRepuesto,
   guardarOrden,
   siguienteNumeroOrden,
   sembrarDatosIniciales,
-} from './servicios/cuentas'
+} from './servicios/datos'
 
 /** Campos que un archivo de Excel puede traer; los demás no se tocan al importar. */
 const CAMPOS_IMPORTABLES = Object.keys(MAPA_CAMPOS)
 
 /** Vistas disponibles una vez iniciada la sesión. */
+/** Iconos de la barra lateral: trazo simple, para que se lean a 18 px. */
+const ICONO = {
+  catalogo: (
+    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18 }}>
+      <path d="M3 8.5 12 4l9 4.5v7L12 20l-9-4.5v-7Z" />
+      <path d="M3 8.5 12 13l9-4.5M12 13v7" />
+    </svg>
+  ),
+  ordenes: (
+    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18 }}>
+      <path d="M8 4h8a2 2 0 0 1 2 2v14l-6-3-6 3V6a2 2 0 0 1 2-2Z" />
+      <path d="M9 9h6M9 13h4" />
+    </svg>
+  ),
+}
+
 const VISTAS = {
   CATALOGO: 'catalogo',
   FICHA: 'ficha',
@@ -56,20 +67,21 @@ const VISTAS = {
  *
  * Dos decisiones que sostienen el resto:
  *
- *   - El catálogo NO es el listado completo: se resuelve a partir de los
- *     identificadores asignados al usuario, así dos cuentas nunca comparten
- *     fichas.
+ *   - El catálogo se resuelve a partir de los identificadores guardados, no
+ *     del archivo generado: así una ficha creada a mano y una del libro de
+ *     planta se tratan igual.
  *   - De la ficha abierta se guarda su ID, no el objeto. Al aplicar una edición
  *     el objeto se recalcula solo, sin necesidad de sincronizar dos estados.
  */
 function App() {
-  const [sesion, setSesion] = useState(null)
+  // Hasta que el almacenamiento esté leído no se sabe qué pintar.
   const [listo, setListo] = useState(false)
   const [vista, setVista] = useState(VISTAS.CATALOGO)
   const [idSeleccionado, setIdSeleccionado] = useState(null)
   const [termino, setTermino] = useState('')
   const [ediciones, setEdiciones] = useState({})
   const [propias, setPropias] = useState([])
+  const [idsCatalogo, setIdsCatalogo] = useState([])
   const [subiendo, setSubiendo] = useState(false)
   const [exportando, setExportando] = useState(false)
   // { texto, error }: un mismo recuadro sirve para confirmar y para avisar de un fallo.
@@ -80,37 +92,21 @@ function App() {
   const [ordenEnEdicion, setOrdenEnEdicion] = useState(null)
   const [ordenDesplegada, setOrdenDesplegada] = useState(null)
   const [confirmandoVaciado, setConfirmandoVaciado] = useState(false)
-  const entradaLibro = useRef(null)
+  // Se evalúa una vez: el permiso no cambia mientras la pestaña está abierta.
+  const [almacenamientoOk] = useState(estaDisponible)
 
-  /**
-   * Único punto donde cambia el usuario activo.
-   *
-   * Las ediciones se cargan aquí, junto con la sesión, en lugar de en un efecto
-   * que reaccione a `sesion`: así no se dispara un render en cascada y ambos
-   * estados no pueden quedar desincronizados ni por un instante.
-   */
-  const aplicarSesion = (nuevaSesion) => {
-    setSesion(nuevaSesion)
-    setEdiciones(nuevaSesion ? leerEdiciones(nuevaSesion.usuario) : {})
-    setPropias(nuevaSesion ? maquinasPropias(nuevaSesion.usuario) : [])
-    setOrdenes(nuevaSesion ? ordenesDeUsuario(nuevaSesion.usuario) : [])
-    setRepuestos(nuevaSesion ? repuestosDeUsuario(nuevaSesion.usuario) : [])
-    setAviso({ texto: '', error: false })
-  }
-
-  // Al arrancar: precarga la cuenta inicial y recupera la sesión persistida.
-  // El sembrado es asíncrono porque el resumen de la contraseña usa Web Crypto.
+  // Al arrancar se prepara el catálogo y se lee todo lo guardado.
   useEffect(() => {
     let vigente = true
 
     sembrarDatosIniciales().then(() => {
       if (!vigente) return
-      const persistida = leerSesion()
-      setSesion(persistida)
-      setEdiciones(persistida ? leerEdiciones(persistida.usuario) : {})
-      setPropias(persistida ? maquinasPropias(persistida.usuario) : [])
-      setOrdenes(persistida ? ordenesDeUsuario(persistida.usuario) : [])
-      setRepuestos(persistida ? repuestosDeUsuario(persistida.usuario) : [])
+
+      setEdiciones(leerEdiciones())
+      setIdsCatalogo(idsDelCatalogo())
+      setPropias(maquinasPropias())
+      setOrdenes(leerOrdenes())
+      setRepuestos(leerRepuestos())
       setListo(true)
     })
 
@@ -120,15 +116,20 @@ function App() {
     }
   }, [])
 
-  // Máquinas del usuario TAL COMO vienen de su origen: las asignadas del libro
-  // oficial más las que él mismo cargó desde un archivo de Excel.
-  // Esta es la referencia contra la que se decide qué cuenta como edición.
-  const catalogoBase = useMemo(() => {
-    if (!sesion) return []
-    return [...obtenerMaquinasPorId(maquinasDeUsuario(sesion.usuario)), ...propias]
-  }, [sesion, propias])
+  // Máquinas TAL COMO vienen de su origen: las del libro de planta más las
+  // creadas o cargadas a mano. Es la referencia contra la que se decide qué
+  // cuenta como edición.
+  //
+  // Los identificadores viven en estado y NO se leen aquí del almacenamiento:
+  // un `useMemo` que lee por su cuenta no se entera de los cambios, y bastaba
+  // con que una acción tocara los ids sin tocar `propias` para que el catálogo
+  // se quedara congelado.
+  const catalogoBase = useMemo(
+    () => [...obtenerMaquinasPorId(idsCatalogo), ...propias],
+    [idsCatalogo, propias],
+  )
 
-  // El mismo catálogo con las ediciones del usuario aplicadas encima.
+  // El mismo catálogo con las ediciones aplicadas encima.
   const catalogoUsuario = useMemo(
     () =>
       catalogoBase.map((maquina) =>
@@ -184,7 +185,7 @@ function App() {
       if (valor !== String(original[campo] ?? '')) cambios[campo] = valor
     }
 
-    const resultado = guardarEdicion(sesion.usuario, idMaquina, cambios)
+    const resultado = guardarEdicion(idMaquina, cambios)
     if (resultado.ok) setEdiciones({ ...resultado.ediciones })
     return resultado.ok
   }
@@ -230,7 +231,7 @@ function App() {
 
     // Una recarga sin fotografía no debe borrar la que ya tenía la ficha.
     const previa = propias.find((existente) => existente.id === maquina.id)
-    const resultado = guardarMaquinaPropia(sesion.usuario, {
+    const resultado = guardarMaquinaPropia({
       ...maquina,
       imagen: maquina.imagen ?? previa?.imagen ?? null,
     })
@@ -245,11 +246,10 @@ function App() {
     )
   }
 
-  /** Exporta a .xlsx el catálogo completo del usuario, con sus ediciones. */
+  /** Exporta a .xlsx el catálogo completo, con sus ediciones. */
   const exportarCatalogo = async () => {
     setExportando(true)
     const resultado = await descargarCatalogoExcel(catalogoUsuario, {
-      usuario: sesion.usuario,
       ordenes,
       repuestos,
     })
@@ -280,7 +280,7 @@ function App() {
    * el origen cambia, pero el almacenamiento y el catálogo no distinguen.
    */
   const crearFicha = (maquina) => {
-    const resultado = guardarMaquinaPropia(sesion.usuario, maquina)
+    const resultado = guardarMaquinaPropia(maquina)
     if (!resultado.ok) return resultado
 
     setPropias(resultado.maquinas)
@@ -290,15 +290,16 @@ function App() {
     return { ok: true }
   }
 
-  /** Quita una ficha del catálogo del usuario y vuelve al listado. */
+  /** Quita una ficha del catálogo y vuelve al listado. */
   const quitarFicha = (maquina) => {
-    const resultado = eliminarMaquina(sesion.usuario, maquina.id)
+    const resultado = eliminarMaquina(maquina.id)
     if (!resultado.ok) {
       informar(resultado.error, true)
       return
     }
 
     setPropias(resultado.maquinas)
+    setIdsCatalogo(resultado.ids)
     setIdSeleccionado(null)
     setVista(VISTAS.CATALOGO)
     informar(`Ficha «${maquina.descripcion}» eliminada.`)
@@ -306,7 +307,7 @@ function App() {
 
   /** Crea o actualiza una orden de trabajo. */
   const aplicarOrden = (orden) => {
-    const resultado = guardarOrden(sesion.usuario, orden)
+    const resultado = guardarOrden(orden)
     if (!resultado.ok) return resultado
 
     setOrdenes(resultado.ordenes)
@@ -325,7 +326,7 @@ function App() {
    * dentro de la ficha y necesita saber si cerrarse o mantener lo escrito.
    */
   const aplicarRepuesto = (repuesto) => {
-    const resultado = guardarRepuesto(sesion.usuario, repuesto)
+    const resultado = guardarRepuesto(repuesto)
     if (!resultado.ok) return resultado
 
     setRepuestos(resultado.repuestos)
@@ -339,7 +340,7 @@ function App() {
 
   /** Elimina una entrada del historial de repuestos. */
   const quitarRepuesto = (repuesto) => {
-    const resultado = eliminarRepuesto(sesion.usuario, repuesto.ref)
+    const resultado = eliminarRepuesto(repuesto.ref)
     if (!resultado.ok) {
       informar(resultado.error, true)
       return
@@ -351,7 +352,7 @@ function App() {
 
   /** Elimina una orden de trabajo. */
   const quitarOrden = (orden) => {
-    const resultado = eliminarOrden(sesion.usuario, orden.ref)
+    const resultado = eliminarOrden(orden.ref)
     if (!resultado.ok) {
       informar(resultado.error, true)
       return
@@ -367,39 +368,9 @@ function App() {
    * Es distinto de «Subir ficha», que lee una sola ficha en disposición
    * vertical. Aquí entra un inventario entero, incluidas las órdenes.
    */
-  const abrirLibro = async (archivo) => {
-    if (!archivo) return
-    informar('Leyendo el archivo…')
-
-    const leido = await leerLibroCompleto(archivo, {
-      idsUsados: new Set(catalogoBase.map((maquina) => maquina.id)),
-    })
-
-    if (!leido.ok) {
-      informar(leido.error, true)
-      return
-    }
-
-    const resultado = importarLibro(sesion.usuario, leido)
-    if (!resultado.ok) {
-      informar(resultado.error, true)
-      return
-    }
-
-    setPropias(resultado.maquinas)
-    setOrdenes(resultado.ordenes)
-    setVista(VISTAS.CATALOGO)
-
-    const partes = [`${leido.maquinas.length} ficha(s)`, `${leido.ordenes.length} orden(es)`]
-    informar(
-      `Importado: ${partes.join(' y ')}.` +
-        (resultado.omitidas ? ` Se omitieron ${resultado.omitidas} por placa repetida.` : ''),
-    )
-  }
-
-  /** Borra todo lo del usuario y lo deja con el catálogo vacío. */
-  const vaciarTodo = () => {
-    const resultado = vaciarDatosDeUsuario(sesion.usuario)
+  /** Borra el catálogo, las órdenes y los repuestos. */
+  const vaciarCatalogo = () => {
+    const resultado = vaciarTodo()
     setConfirmandoVaciado(false)
 
     if (!resultado.ok) {
@@ -407,43 +378,76 @@ function App() {
       return
     }
 
+    setIdsCatalogo([])
     setPropias([])
     setOrdenes([])
     setEdiciones({})
     setIdSeleccionado(null)
     setTermino('')
     setVista(VISTAS.CATALOGO)
-    informar('Se vaciaron tus fichas y órdenes.')
+    informar('Se vaciaron las fichas y las órdenes.')
   }
 
-  /** Cierra la sesión y devuelve la aplicación a su estado inicial. */
-  const salir = () => {
-    cerrarSesion()
-    aplicarSesion(null)
-    setVista(VISTAS.CATALOGO)
-    setIdSeleccionado(null)
-    setTermino('')
-  }
-
-  // Mientras se lee el almacenamiento no se decide qué vista corresponde: pintar
-  // el login aquí provocaría un parpadeo en cada recarga con sesión abierta.
+  // Mientras se lee el almacenamiento no hay nada que pintar todavía.
   if (!listo) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-100">
+      <div className="flex min-h-screen items-center justify-center bg-grafito-50">
         <p className="text-sm text-gray-500">Cargando…</p>
       </div>
     )
   }
 
-  if (!sesion) return <Autenticacion onAutenticar={aplicarSesion} />
-
   const enFicha = vista === VISTAS.FICHA && maquinaSeleccionada !== null
 
-  return (
-    <div className="flex min-h-screen flex-col">
-      <Header usuario={sesion.usuario} onCerrarSesion={salir} />
+  const modulos = [
+    { clave: VISTAS.CATALOGO, texto: 'Equipos', cuenta: catalogoUsuario.length, icono: ICONO.catalogo },
+    { clave: VISTAS.ORDENES, texto: 'Órdenes de trabajo', cuenta: ordenes.length, icono: ICONO.ordenes },
+  ]
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-6 sm:px-6 sm:py-8">
+  /** Título de la pantalla actual, para la cabecera del contenido. */
+  const tituloVista = enFicha
+    ? 'Ficha técnica'
+    : (modulos.find((m) => m.clave === vista)?.texto ?? 'Equipos')
+
+  return (
+    <div className="flex min-h-screen flex-col lg:flex-row">
+      <BarraLateral
+        vista={vista}
+        onCambiar={(clave) => {
+          setVista(clave)
+          setIdSeleccionado(null)
+        }}
+        modulos={modulos}
+      />
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Cabecera del contenido: dice dónde estás y deja sitio a las acciones. */}
+        <header className="flex items-center justify-between gap-4 border-b border-gray-200 bg-white px-4 py-3 sm:px-6 sm:py-4">
+          <div className="min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-acento-700">
+              Mantenimiento
+            </p>
+            <h1 className="truncate text-lg font-bold text-gray-900 sm:text-xl">{tituloVista}</h1>
+          </div>
+        </header>
+
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
+        {/*
+          Sin almacenamiento no se guarda nada, y el fallo es silencioso: se
+          registran órdenes y repuestos durante un rato y se pierden al
+          recargar. Más vale decirlo al entrar.
+        */}
+        {!almacenamientoOk && (
+          <p
+            role="alert"
+            className="mb-5 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
+          >
+            Este navegador tiene el almacenamiento local bloqueado (suele pasar en ventana
+            privada). Puedes consultar el catálogo, pero <b>nada de lo que registres se
+            guardará</b> al recargar. Descarga el Excel antes de cerrar.
+          </p>
+        )}
+
         {enFicha ? (
           <FichaTecnica
             // Cambiar de ficha monta un componente nuevo: un borrador a medias
@@ -459,32 +463,6 @@ function App() {
           />
         ) : (
           <>
-            {/* Dos areas de trabajo: el inventario y las intervenciones. */}
-            <div className="mb-6 flex gap-1 border-b border-gray-300 overflow-x-auto no-scrollbar scroll-smooth" role="tablist">
-              {[
-                [VISTAS.CATALOGO, 'Catálogo', catalogoUsuario.length],
-                [VISTAS.ORDENES, 'Órdenes de trabajo', ordenes.length],
-              ].map(([clave, texto, cuenta]) => (
-                <button
-                  key={clave}
-                  type="button"
-                  role="tab"
-                  aria-selected={vista === clave}
-                  onClick={() => setVista(clave)}
-                  className={`-mb-px shrink-0 rounded-t-md border-b-2 px-3 py-2 text-xs sm:px-4 sm:py-2.5 sm:text-sm font-semibold transition ${
-                    vista === clave
-                      ? 'border-blue-600 text-blue-700'
-                      : 'border-transparent text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-                  }`}
-                >
-                  {texto}
-                  <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                    {cuenta}
-                  </span>
-                </button>
-              ))}
-            </div>
-
             {vista === VISTAS.ORDENES ? (
               <>
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -549,14 +527,6 @@ function App() {
                     Subir ficha (Excel)
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => entradaLibro.current?.click()}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 sm:px-3.5 sm:text-sm"
-                  >
-                    <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" /></svg>
-                    Abrir libro (.xlsx)
-                  </button>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
@@ -577,23 +547,12 @@ function App() {
                         onClick={exportarCatalogoHtml}
                         className="inline-flex items-center justify-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 sm:px-3.5 sm:text-sm"
                       >
-                        <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                        <svg className="h-4 w-4 text-acento-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
                         Catálogo (.html)
                       </button>
                     </>
                   )}
 
-                  <input
-                    ref={entradaLibro}
-                    type="file"
-                    accept=".xlsx,.xls,.xlsm"
-                    className="hidden"
-                    onChange={(evento) => {
-                      abrirLibro(evento.target.files?.[0])
-                      // Permite volver a elegir el mismo archivo.
-                      evento.target.value = ''
-                    }}
-                  />
 
                   {(catalogoUsuario.length > 0 || ordenes.length > 0) && (
                     <button
@@ -624,7 +583,7 @@ function App() {
                   </button>
                   <button
                     type="button"
-                    onClick={vaciarTodo}
+                    onClick={vaciarCatalogo}
                     className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
                   >
                     Sí, vaciar
@@ -655,6 +614,7 @@ function App() {
           </>
         )}
       </main>
+      </div>
 
       {subiendo && (
         <SubirFicha
@@ -683,11 +643,6 @@ function App() {
         />
       )}
 
-      <footer className="border-t border-gray-300 bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-5 text-xs text-slate-500 sm:px-6">
-          {INSTITUCION.titulo} · {INSTITUCION.subtitulo}
-        </div>
-      </footer>
     </div>
   )
 }

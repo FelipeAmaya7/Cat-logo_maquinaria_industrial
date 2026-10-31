@@ -47,7 +47,6 @@ export const GRUPOS = [
       'marca',
       'modelo',
       'serie',
-      'numeroMotor',
     ],
   },
   {
@@ -59,6 +58,7 @@ export const GRUPOS = [
       'vidaUtil',
       'estado',
       'disponibilidad',
+      'criticidad',
       'precio',
     ],
   },
@@ -90,11 +90,6 @@ export const GRUPOS = [
       'material',
       'color',
       'dimension',
-      'longitud',
-      'ancho',
-      'alto',
-      'pesoVacio',
-      'pesoBruto',
     ],
   },
   {

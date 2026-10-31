@@ -40,7 +40,7 @@ export function DistintivoSistema({
 }) {
   return (
     <div
-      className={`flex shrink-0 items-center justify-center rounded-md bg-industrial-800 text-white ${className}`}
+      className={`flex shrink-0 items-center justify-center rounded-md bg-grafito-800 text-white ${className}`}
     >
       <IconoSistema className={claseIcono} />
     </div>

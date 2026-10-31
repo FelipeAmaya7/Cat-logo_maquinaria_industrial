@@ -21,18 +21,22 @@ src/
 ├── App.jsx              Controlador de navegación (estado: catálogo | ficha)
 ├── index.css            Directivas de Tailwind y estilos base
 ├── components/
-│   ├── Autenticacion.jsx Login y registro (demostración, sin servidor)
-│   ├── Header.jsx       Encabezado institucional + cerrar sesión
+│   ├── BarraLateral.jsx Navegación por módulos
 │   ├── Buscador.jsx     Campo controlado; eleva el estado a App
-│   ├── ListaTarjetas.jsx Cuadrícula de tarjetas del catálogo
-│   └── FichaTecnica.jsx Documento técnico formal + botón INICIO
+│   ├── ListaTarjetas.jsx Cuadrícula de equipos (código, estado, criticidad)
+│   ├── FichaTecnica.jsx Documento técnico + repuestos de la máquina
+│   ├── FormularioFicha.jsx  Alta de una ficha sin partir de un Excel
+│   ├── FormularioOrden.jsx  Alta de una orden de trabajo
+│   └── ListaOrdenes.jsx     Listado de órdenes
 ├── data/
-│   ├── maquinas.js      GENERADO: catálogo completo + funciones puras
-│   ├── catalogo.js      Recorte visible (6 máquinas) — escrito a mano
-│   └── institucion.js   Identidad institucional (logo, textos, formato de fecha)
+│   ├── maquinas.js      GENERADO: las 49 fichas + funciones puras
+│   ├── catalogo.js      Orden y resolución del catálogo — escrito a mano
+│   ├── gruposFicha.js   Secciones del formulario de ficha
+│   ├── ordenes.js       Campos de las órdenes de trabajo
+│   └── institucion.js   Textos del sistema y formato de fecha
 ├── servicios/
 │   ├── almacenamiento.js Envoltura segura sobre localStorage
-│   └── cuentas.js       Cuentas, sesión y aislamiento por usuario
+│   └── datos.js         Catálogo, ediciones, órdenes y repuestos
 └── ../scripts/
     ├── extraer-fichas.mjs    Lee las celdas y regenera maquinas.js
     └── extraer-imagenes.mjs  Extrae logo y fotos del ZIP OpenXML
@@ -79,39 +83,28 @@ no pudiera procesar alguna, se guarda el original y el informe lo indica.
 Si `imagen` es `null`, el archivo falta o el navegador no puede mostrarlo, la
 interfaz cae al recuadro gris "Sin fotografía registrada".
 
-## Acceso y aislamiento de datos
+## Datos y almacenamiento
 
-La aplicación pide iniciar sesión antes de mostrar el catálogo. Cuenta
-precargada la primera vez que se abre:
+**No hay inicio de sesión.** La aplicación se abre y se usa: es una herramienta
+de planta, no un sistema con cuentas. Todo se guarda en el `localStorage` del
+navegador bajo una sola colección de claves.
 
-| Usuario | Contraseña |
-|---------|-----------|
-| `jhamilamaya` | `12345` |
+Consecuencia que conviene tener presente: **los datos son de ese navegador**. No
+viajan entre equipos ni se respaldan solos. El puente para llevarlos a otro sitio
+es la exportación a Excel.
 
-Cada cuenta ve **solo** las máquinas que tiene asignadas: `jhamilamaya` arranca
-con las 6 del catálogo inicial y cualquier cuenta nueva empieza vacía, con el
-mensaje "No tienes fichas técnicas registradas aún". La sesión se guarda en
-localStorage, así que sobrevive a una recarga.
+Si el navegador bloquea el almacenamiento —ventana privada, datos de sitio
+desactivados— la aplicación lo avisa al entrar: el catálogo se puede consultar,
+pero nada de lo que se registre sobrevive a una recarga.
 
-> **Alcance de la autenticación.** Es una demostración adecuada para una
-> aplicación estática, **no** un control de seguridad: todo ocurre en el
-> navegador y cualquiera puede leer o modificar localStorage desde las
-> herramientas de desarrollo. Las contraseñas no se guardan en claro (resumen
-> SHA-256 con sal por cuenta), pero el aislamiento entre usuarios es una
-> separación funcional, no una barrera. Una versión de producción necesita un
-> servidor que valide credenciales y emita un token.
-
-### Por qué el recorte vive fuera de `maquinas.js`
+### Por qué el catálogo vive fuera de `maquinas.js`
 
 `src/data/maquinas.js` lo regenera `npm run datos`: editarlo a mano se pierde en
-la siguiente extracción. Por eso la selección de las 6 máquinas está en
+la siguiente extracción. Por eso el orden y la resolución del catálogo están en
 `src/data/catalogo.js`, un módulo escrito a mano que consume el generado.
 
-El criterio es: tener fotografía extraída, luego menor cantidad de campos sin
-diligenciar y, como desempate, el orden del libro. Se ordena por completitud
-porque las primeras hojas son herramientas de taller con la ficha a medio
-llenar; tomar "las seis primeras" dejaría cuatro fichas sin capacidad, función,
-año ni turno.
+Las 49 fichas se ordenan por completitud —menos campos vacíos primero— y, a
+igualdad, por el orden del libro.
 
 ## Comandos
 

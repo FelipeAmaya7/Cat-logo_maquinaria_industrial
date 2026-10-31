@@ -9,7 +9,7 @@
   }
 
   body {
-    @apply bg-gray-100 text-gray-800 antialiased;
+    @apply bg-grafito-50 text-gray-800 antialiased;
     overflow-x: hidden;
     min-width: 0;
   }

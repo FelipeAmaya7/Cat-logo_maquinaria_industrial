@@ -7,9 +7,6 @@
  */
 import { maquinas } from './maquinas'
 
-/** Cuántas máquinas componen el catálogo inicial. */
-export const TAMANO_CATALOGO_INICIAL = 6
-
 /** Marcador que usa el extractor cuando el formato venía sin diligenciar. */
 const SIN_DATO = 'No registrado'
 
@@ -35,58 +32,23 @@ const vaciosDe = (maquina) =>
 export const maquinasConFotografia = maquinas.filter((maquina) => maquina.imagen)
 
 /**
- * Catálogo inicial: las máquinas con fotografía MÁS COMPLETAS.
+ * Catálogo: TODAS las fichas del libro de planta.
  *
- * Criterio, en este orden:
- *   1. Tener fotografía técnica extraída.
- *   2. Menor cantidad de campos sin diligenciar.
- *   3. Orden original del libro de Excel, como desempate estable.
+ * Antes se recortaba a seis. Aquel recorte existía porque el catálogo se
+ * repartía entre usuarios y había que darle un conjunto pequeño a la cuenta
+ * precargada; sin inicio de sesión no tiene sentido esconder el inventario.
  *
- * Se ordena por completitud y no por posición porque las primeras hojas del
- * libro son herramientas de taller con la ficha a medio llenar; tomarlas "las
- * seis primeras" dejaría cuatro fichas sin capacidad, función, año ni turno.
- * Para volver al orden del libro basta con quitar la comparación por vacíos.
+ * Se ordenan por completitud —menos campos vacíos primero— y, a igualdad, por
+ * el orden del libro. Así las fichas bien diligenciadas abren el listado y las
+ * que están a medio llenar quedan al final, visibles pero sin estorbar.
  */
-export const catalogoInicial = [...maquinasConFotografia]
+export const catalogoInicial = [...maquinas]
   .map((maquina, posicion) => ({ maquina, posicion, vacios: vaciosDe(maquina) }))
   .sort((a, b) => a.vacios - b.vacios || a.posicion - b.posicion)
-  .slice(0, TAMANO_CATALOGO_INICIAL)
   .map((entrada) => entrada.maquina)
 
-/** Identificadores del catálogo inicial, que es lo que se guarda por usuario. */
+/** Identificadores del catálogo, que es lo que se guarda en el navegador. */
 export const idsCatalogoInicial = catalogoInicial.map((maquina) => maquina.id)
-
-/**
- * Conjunto de fotografías realmente extraídas del Excel, usado como respaldo.
- * Solo contiene nombres de archivos que el script escribió en public/maquinas/,
- * así que cualquier imagen tomada de aquí existe en disco.
- */
-const RESPALDOS = maquinasConFotografia.map((maquina) => maquina.imagen)
-
-/**
- * Garantiza que una máquina tenga fotografía.
- *
- * El catálogo inicial ya se arma solo con máquinas que tienen foto propia, así
- * que esta red de seguridad no debería activarse. Existe para que un cambio en
- * el Excel —una hoja a la que le quiten la imagen— nunca deje una tarjeta o una
- * ficha sin fotografía.
- *
- * Cuando la imagen es prestada se marca con `imagenEsRespaldo`, porque mostrar
- * la foto de otra máquina sin advertirlo sería engañoso en un catálogo técnico.
- *
- * @param {import('./maquinas').Maquina} maquina
- * @param {number} indice Posición en el listado, para repartir los respaldos.
- */
-function conFotografiaGarantizada(maquina, indice) {
-  if (maquina.imagen) return maquina
-  if (RESPALDOS.length === 0) return maquina
-
-  return {
-    ...maquina,
-    imagen: RESPALDOS[indice % RESPALDOS.length],
-    imagenEsRespaldo: true,
-  }
-}
 
 /**
  * Resuelve una lista de identificadores a sus objetos de máquina.
@@ -102,5 +64,5 @@ export function obtenerMaquinasPorId(ids) {
   return ids
     .map((id) => porId.get(id))
     .filter(Boolean)
-    .map(conFotografiaGarantizada)
+
 }

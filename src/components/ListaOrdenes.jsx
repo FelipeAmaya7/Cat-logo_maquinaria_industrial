@@ -113,7 +113,7 @@ function ListaOrdenes({ ordenes, maquinas, refDesplegada, onDesplegar, onEditar,
                         <button
                           type="button"
                           onClick={() => onEditar(orden)}
-                          className="rounded border border-blue-600 px-2.5 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-50"
+                          className="rounded border border-acento-600 px-2.5 py-1 text-xs font-semibold text-acento-700 transition hover:bg-acento-50"
                         >
                           Editar
                         </button>
