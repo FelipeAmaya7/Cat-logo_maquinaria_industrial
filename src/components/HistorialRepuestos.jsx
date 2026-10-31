@@ -7,7 +7,7 @@ import {
 } from '../data/repuestos'
 
 const CAMPO =
-  'w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+  'w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-800 outline-none transition focus:border-acento-500 focus:ring-2 focus:ring-acento-200'
 const CAMPO_INVALIDO =
   'w-full rounded-md border border-red-500 bg-white px-2.5 py-1.5 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-red-200'
 const ETIQUETA = 'mb-1 block text-[11px] font-bold uppercase tracking-wide text-gray-600'
@@ -153,7 +153,7 @@ function HistorialRepuestos({ entradas, idMaquina, onGuardar, onEliminar }) {
           <button
             type="button"
             onClick={abrirNuevo}
-            className="shrink-0 rounded-md border border-blue-600 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm transition hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
+            className="shrink-0 rounded-md border border-acento-600 bg-white px-3 py-1.5 text-xs font-semibold text-acento-700 shadow-sm transition hover:bg-acento-50 focus:outline-none focus:ring-2 focus:ring-acento-400 focus:ring-offset-2"
           >
             + Añadir repuesto
           </button>
@@ -162,7 +162,7 @@ function HistorialRepuestos({ entradas, idMaquina, onGuardar, onEliminar }) {
 
       {/* Formulario, aquí mismo: el gesto es anotar algo corto. */}
       {editando && (
-        <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50/50 p-4">
+        <div className="mb-4 rounded-lg border border-acento-200 bg-acento-50/50 p-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {CAMPOS_REPUESTO.map((definicion) => (
               <div
@@ -194,7 +194,7 @@ function HistorialRepuestos({ entradas, idMaquina, onGuardar, onEliminar }) {
             <button
               type="button"
               onClick={cerrar}
-              className="rounded-md border border-gray-300 bg-white px-4 py-1.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-100"
+              className="rounded-md border border-gray-300 bg-white px-4 py-1.5 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-grafito-50"
             >
               Cancelar
             </button>
@@ -262,7 +262,7 @@ function HistorialRepuestos({ entradas, idMaquina, onGuardar, onEliminar }) {
                           <button
                             type="button"
                             onClick={() => abrirExistente(entrada)}
-                            className="rounded px-2 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-50"
+                            className="rounded px-2 py-1 text-xs font-semibold text-acento-700 transition hover:bg-acento-50"
                           >
                             Editar
                           </button>

@@ -143,7 +143,7 @@ function ControlFecha({
           title="Abrir selector de fecha"
           tabIndex={-1}
           aria-hidden="true"
-          className="absolute right-2.5 flex items-center justify-center text-gray-500 transition hover:text-blue-600 focus:outline-none"
+          className="absolute right-2.5 flex items-center justify-center text-gray-500 transition hover:text-acento-600 focus:outline-none"
         >
           <svg
             className="h-4 w-4"
@@ -166,7 +166,7 @@ function ControlFecha({
         <button
           type="button"
           onClick={fijarHoy}
-          className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 hover:bg-blue-100 transition"
+          className="inline-flex items-center gap-1 rounded bg-acento-50 px-2 py-0.5 text-[11px] font-medium text-acento-700 hover:bg-acento-100 transition"
           title="Fijar la fecha de hoy"
         >
           Hoy
@@ -175,7 +175,7 @@ function ControlFecha({
           <button
             type="button"
             onClick={limpiar}
-            className="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600 hover:bg-gray-200 transition"
+            className="inline-flex items-center gap-1 rounded bg-grafito-50 px-2 py-0.5 text-[11px] font-medium text-gray-600 hover:bg-gray-200 transition"
             title="Quitar fecha"
           >
             Limpiar

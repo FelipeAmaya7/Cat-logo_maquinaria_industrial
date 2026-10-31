@@ -8,6 +8,11 @@
 
 /** @type {Object<string, {tipo: string, ph?: string, opciones?: string[], etiqueta?: string}>} */
 export const CONTROLES = {
+  criticidad: {
+    tipo: "select",
+    opciones: ["Crítica", "Alta", "Media", "Baja"],
+    etiqueta: "Criticidad",
+  },
   placaNueva: { tipo: "text", ph: "Ej. EM00068", etiqueta: "Código / Placa" },
   placaPadre: { tipo: "text", ph: "Ej. LÍNEA-01 (opcional)", etiqueta: "Código equipo padre / Línea" },
   descripcion: { tipo: "text", ph: "Ej. Flexográfica 4 Colores", etiqueta: "Descripción de la máquina" },
@@ -15,7 +20,6 @@ export const CONTROLES = {
   marca: { tipo: "text", ph: "Ej. Bobst, Heidelberg, Yaota, Imomill", etiqueta: "Marca" },
   modelo: { tipo: "text", ph: "Ej. ZX6350A, QMS992B, CYS2060B", etiqueta: "Modelo" },
   serie: { tipo: "text", ph: "Número de serie de fábrica", etiqueta: "Serie" },
-  numeroMotor: { tipo: "text", ph: "Ej. TW YD100L-B/4 o 15 kW", etiqueta: "Número de motor / Potencia" },
 
   anioAdquisicion: { tipo: "number", ph: "2020", etiqueta: "Año de compra" },
   anioInstalacion: { tipo: "number", ph: "2021", etiqueta: "Año instalación" },
@@ -46,11 +50,6 @@ export const CONTROLES = {
   material: { tipo: "text", ph: "Ej. Acero, Hierro fundido, Metal", etiqueta: "Material" },
   color: { tipo: "text", ph: "Ej. Verde industrial, Gris, Azul", etiqueta: "Color" },
   dimension: { tipo: "text", ph: "Ej. Formato máx: 1200 x 2400 mm", etiqueta: "Dimensión" },
-  longitud: { tipo: "number", ph: "0", etiqueta: "Longitud (m)" },
-  ancho: { tipo: "number", ph: "0", etiqueta: "Ancho (m)" },
-  alto: { tipo: "number", ph: "0", etiqueta: "Alto (m)" },
-  pesoVacio: { tipo: "number", ph: "0", etiqueta: "Peso vacío (kg)" },
-  pesoBruto: { tipo: "number", ph: "0", etiqueta: "Peso total / operativo (kg)" },
 
   funcion: { tipo: "area", ph: "Ej. Impresión flexográfica y ranurado de cajas de cartón corrugado", etiqueta: "Función que presta" },
   materialProcesado: { tipo: "text", ph: "Ej. Cartón corrugado, Papel kraft, Liner", etiqueta: "Material procesado" },

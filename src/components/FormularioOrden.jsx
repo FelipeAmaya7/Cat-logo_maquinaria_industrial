@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { CAMPOS_ORDEN, aplicarDatosDeEquipo, ordenEnBlanco } from '../data/ordenes'
 
 const CAMPO =
-  'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200'
+  'w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm outline-none transition focus:border-acento-500 focus:ring-2 focus:ring-acento-200'
 const CAMPO_AUTO = `${CAMPO} bg-gray-50 text-gray-600`
 const CAMPO_INVALIDO =
   'w-full rounded-md border border-red-500 bg-white px-3 py-2 text-sm text-gray-800 shadow-sm outline-none focus:ring-2 focus:ring-red-200'
@@ -196,7 +196,7 @@ function FormularioOrden({ orden, siguienteNumero, maquinas, onGuardar, onCerrar
             type="button"
             onClick={onCerrar}
             aria-label="Cerrar"
-            className="shrink-0 rounded-md p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300"
+            className="shrink-0 rounded-md p-1.5 text-gray-400 transition hover:bg-grafito-50 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300"
           >
             <svg
               viewBox="0 0 24 24"
@@ -243,7 +243,7 @@ function FormularioOrden({ orden, siguienteNumero, maquinas, onGuardar, onCerrar
           <button
             type="button"
             onClick={onCerrar}
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
+            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-grafito-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
           >
             Cancelar
           </button>

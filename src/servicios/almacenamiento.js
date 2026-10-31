@@ -15,9 +15,9 @@ const PREFIJO = 'fichas-tecnicas:'
 /**
  * Prefijo usado antes de retirar la marca corporativa.
  *
- * Renombrar a secas habría dejado inaccesibles las cuentas, sesiones, ediciones
- * y fichas cargadas de quien ya venía usando la aplicación: para el navegador
- * son claves distintas. Por eso las entradas viejas se copian una sola vez, al
+ * Renombrar a secas habría dejado inaccesibles las ediciones y las fichas
+ * cargadas de quien ya venía usando la aplicación: para el navegador son
+ * claves distintas. Por eso las entradas viejas se copian una sola vez, al
  * cargar el módulo, y se eliminan las originales.
  */
 const PREFIJO_ANTERIOR = 'empaques-cartones:'
@@ -41,7 +41,47 @@ function migrarClavesAnteriores() {
   }
 }
 
+/**
+ * Recoge los datos que quedaron segmentados por usuario.
+ *
+ * Mientras hubo inicio de sesión, cada dato se guardaba con el usuario pegado
+ * a la clave: `catalogo:jhamilamaya`, `ordenes-trabajo:jhamilamaya`. Al retirar
+ * las cuentas, las funciones pasaron a leer `catalogo` a secas, de modo que
+ * todo lo registrado antes seguía en el navegador pero inalcanzable: fichas
+ * creadas a mano, órdenes, repuestos y ediciones desaparecían de la pantalla
+ * sin aviso.
+ *
+ * Esta migración los recupera una sola vez. Si hubiera datos de varias cuentas
+ * gana el primero que aparezca, porque sin sesión no hay forma de preguntar
+ * cuál conservar; los demás se dejan intactos en vez de borrarlos.
+ */
+function migrarClavesPorUsuario() {
+  const CLAVES = ['catalogo', 'ediciones', 'maquinas-propias', 'ordenes-trabajo', 'repuestos']
+
+  try {
+    for (const base of CLAVES) {
+      const destino = PREFIJO + base
+      if (window.localStorage.getItem(destino) !== null) continue
+
+      const conUsuario = Object.keys(window.localStorage).find((clave) =>
+        clave.startsWith(`${destino}:`),
+      )
+      if (!conUsuario) continue
+
+      window.localStorage.setItem(destino, window.localStorage.getItem(conUsuario))
+      window.localStorage.removeItem(conUsuario)
+    }
+
+    // Las cuentas y la sesión ya no tienen uso: se retiran con sus contraseñas.
+    window.localStorage.removeItem(PREFIJO + 'cuentas')
+    window.localStorage.removeItem(PREFIJO + 'sesion')
+  } catch {
+    // Almacenamiento bloqueado: no hay nada que migrar y nada que romper.
+  }
+}
+
 migrarClavesAnteriores()
+migrarClavesPorUsuario()
 
 /**
  * Lee un valor y lo deserializa.

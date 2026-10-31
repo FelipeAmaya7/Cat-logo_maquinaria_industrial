@@ -144,7 +144,7 @@ function SubirFicha({ onConfirmar, onCerrar, idsCatalogo }) {
             type="button"
             onClick={onCerrar}
             aria-label="Cerrar"
-            className="shrink-0 rounded-md p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300"
+            className="shrink-0 rounded-md p-1.5 text-gray-400 transition hover:bg-grafito-50 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300"
           >
             <svg
               viewBox="0 0 24 24"
@@ -170,7 +170,7 @@ function SubirFicha({ onConfirmar, onCerrar, idsCatalogo }) {
             onDragLeave={() => setArrastrando(false)}
             onDrop={alSoltar}
             className={`rounded-lg border-2 border-dashed px-4 py-8 text-center transition ${
-              arrastrando ? 'border-blue-500 bg-blue-50' : 'border-gray-300 bg-gray-50'
+              arrastrando ? 'border-acento-500 bg-acento-50' : 'border-gray-300 bg-gray-50'
             }`}
           >
             <svg
@@ -195,7 +195,7 @@ function SubirFicha({ onConfirmar, onCerrar, idsCatalogo }) {
               <button
                 type="button"
                 onClick={() => entradaExcel.current?.click()}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
+                className="rounded-md bg-acento-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-acento-700 focus:outline-none focus:ring-2 focus:ring-acento-400 focus:ring-offset-2"
               >
                 Seleccionar Excel
               </button>
@@ -279,7 +279,7 @@ function SubirFicha({ onConfirmar, onCerrar, idsCatalogo }) {
               </div>
 
               {yaExiste && (
-                <p className="border-t border-gray-200 bg-blue-50 px-4 py-2 text-[11px] leading-snug text-blue-800">
+                <p className="border-t border-gray-200 bg-acento-50 px-4 py-2 text-[11px] leading-snug text-acento-800">
                   Ya existe una ficha con la placa <strong>{maquina.placaNueva}</strong> (
                   <span className="font-mono">{maquina.id}</span>). Al confirmar se
                   ACTUALIZARÁ con los datos de este archivo; no se creará una copia.
@@ -300,7 +300,7 @@ function SubirFicha({ onConfirmar, onCerrar, idsCatalogo }) {
           <button
             type="button"
             onClick={onCerrar}
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
+            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-grafito-50 focus:outline-none focus:ring-2 focus:ring-gray-300 focus:ring-offset-2"
           >
             Cancelar
           </button>

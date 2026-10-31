@@ -3,7 +3,7 @@
  *
  * Uso:
  *   node scripts/generar-html.mjs            # todas las fichas
- *   node scripts/generar-html.mjs --catalogo # solo las 6 del catálogo inicial
+ *   node scripts/generar-html.mjs --catalogo # solo las fichas con fotografía
  *
  * Para qué sirve
  * --------------
@@ -32,14 +32,18 @@ const raizProyecto = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const CARPETA_MAQUINAS = resolve(raizProyecto, 'public/maquinas')
 
 const { maquinas } = await import('../src/data/maquinas.js')
-const { catalogoInicial } = await import('../src/data/catalogo.js')
+const { maquinasConFotografia } = await import('../src/data/catalogo.js')
 const { INSTITUCION } = await import('../src/data/institucion.js')
 
-const soloCatalogo = process.argv.includes('--catalogo')
-const seleccion = soloCatalogo ? catalogoInicial : maquinas
+// `--catalogo` recorta a las fichas CON FOTOGRAFÍA, que son las que lucen en un
+// documento para entregar; sin la bandera entran las 49. Antes recortaba a
+// `catalogoInicial`, que desde que el catálogo abarca todo el libro es el
+// listado completo: las dos banderas generaban el mismo archivo con dos nombres.
+const soloConFoto = process.argv.includes('--catalogo')
+const seleccion = soloConFoto ? maquinasConFotografia : maquinas
 const ARCHIVO_SALIDA = resolve(
   raizProyecto,
-  soloCatalogo ? 'catalogo-maquinaria.html' : 'catalogo-maquinaria-completo.html',
+  soloConFoto ? 'catalogo-maquinaria.html' : 'catalogo-maquinaria-completo.html',
 )
 
 /** Campos que se muestran en la ficha, en el orden del formato de planta. */
@@ -414,7 +418,7 @@ pintar(MAQUINAS);
 writeFileSync(ARCHIVO_SALIDA, html, 'utf8')
 
 const pesoMB = (Buffer.byteLength(html, 'utf8') / 1024 / 1024).toFixed(1)
-console.log(`Fichas incluidas : ${datos.length}${soloCatalogo ? ' (catálogo inicial)' : ' (todas)'}`)
+console.log(`Fichas incluidas : ${datos.length}${soloConFoto ? ' (con fotografía)' : ' (todas)'}`)
 console.log(`Con fotografía   : ${conFoto}`)
 console.log(`Peso del archivo : ${pesoMB} MB`)
 console.log(`\nEscrito: ${ARCHIVO_SALIDA.split(/[\\/]/).pop()}`)

@@ -50,14 +50,14 @@ function Buscador({ termino, onBuscar, resultados, total }) {
           onChange={(evento) => onBuscar(evento.target.value)}
           placeholder="Nombre, placa o ID (ej.: flexográfica, EM00012, YAOTA)"
           autoComplete="off"
-          className="w-full rounded-md border border-gray-300 bg-white py-2.5 pl-10 pr-24 text-sm shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+          className="w-full rounded-md border border-gray-300 bg-white py-2.5 pl-10 pr-24 text-sm shadow-sm outline-none transition focus:border-acento-500 focus:ring-2 focus:ring-acento-200"
         />
 
         {termino && (
           <button
             type="button"
             onClick={() => onBuscar('')}
-            className="absolute inset-y-0 right-0 my-1 mr-1.5 rounded px-3 text-xs font-semibold uppercase tracking-wide text-blue-600 transition hover:bg-blue-50"
+            className="absolute inset-y-0 right-0 my-1 mr-1.5 rounded px-3 text-xs font-semibold uppercase tracking-wide text-acento-600 transition hover:bg-acento-50"
           >
             Limpiar
           </button>
