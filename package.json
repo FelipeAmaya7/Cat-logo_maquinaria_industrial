@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
+    "test": "node --import ./scripts/registrar-resolucion.mjs scripts/pruebas.mjs",
     "preview": "vite preview",
     "datos": "node scripts/extraer-fichas.mjs",
     "predeploy": "npm run build",
