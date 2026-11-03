@@ -17,15 +17,25 @@ const ETIQUETA = 'mb-1 block text-xs font-bold uppercase tracking-wide text-gray
  *
  * @param {Object} props
  * @param {Object|null} props.orden        Orden a editar, o null para crear una nueva.
+ * @param {string} [props.equipoInicial]   Equipo ya elegido, al crear desde una ficha.
  * @param {number} props.siguienteNumero   Consecutivo sugerido al crear.
  * @param {Object[]} props.maquinas        Catálogo del usuario, para el desplegable.
  * @param {(orden: Object) => {ok: boolean, error?: string}} props.onGuardar
  * @param {() => void} props.onCerrar
  */
-function FormularioOrden({ orden, siguienteNumero, maquinas, onGuardar, onCerrar }) {
-  const [borrador, setBorrador] = useState(
-    () => orden ?? { ...ordenEnBlanco(siguienteNumero), ref: `ot-${Date.now().toString(36)}` },
-  )
+function FormularioOrden({ orden, equipoInicial, siguienteNumero, maquinas, onGuardar, onCerrar }) {
+  const [borrador, setBorrador] = useState(() => {
+    if (orden) return orden
+
+    const nueva = { ...ordenEnBlanco(siguienteNumero), ref: `ot-${Date.now().toString(36)}` }
+
+    // Una OT creada desde la ficha ya sabe de qué equipo habla: llega con el
+    // desplegable resuelto y los datos del activo copiados, igual que si se
+    // hubiera elegido a mano. Es la diferencia entre abrir el formulario y
+    // tener que volver a buscar la máquina en una lista de cuarenta y nueve.
+    const maquina = maquinas.find((m) => m.id === equipoInicial) ?? null
+    return maquina ? aplicarDatosDeEquipo({ ...nueva, equipo: maquina.id }, maquina) : nueva
+  })
   const [errores, setErrores] = useState({})
   const [error, setError] = useState('')
 

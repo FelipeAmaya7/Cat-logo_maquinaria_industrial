@@ -8,10 +8,21 @@ import SubirFicha from './components/SubirFicha'
 import FormularioFicha from './components/FormularioFicha'
 import FormularioOrden from './components/FormularioOrden'
 import ListaOrdenes from './components/ListaOrdenes'
+import Filtros from './components/Filtros'
+import PanelAlertas from './components/PanelAlertas'
+import Indicadores from './components/Indicadores'
+import Programacion from './components/Programacion'
+import Taxonomia from './components/Taxonomia'
 import { filtrarMaquinas } from './data/maquinas'
 import { obtenerMaquinasPorId } from './data/catalogo'
 import { MAPA_CAMPOS } from './servicios/anclajeRotulos'
 import { repuestosDeMaquina } from './data/repuestos'
+import { ordenesDeMaquina } from './data/ordenes'
+import { calcularAlertas } from './servicios/alertas'
+import { calcularIndicadores } from './servicios/indicadores'
+import { agruparProgramacion } from './servicios/programacion'
+import { construirTaxonomia } from './servicios/taxonomia'
+import { calidadDelCatalogo } from './servicios/calidadDatos'
 import { descargarCatalogoExcel } from './servicios/exportarExcel'
 import { descargarCatalogoHtml } from './servicios/exportarHtml'
 import {
@@ -50,12 +61,58 @@ const ICONO = {
       <path d="M9 9h6M9 13h4" />
     </svg>
   ),
+  alertas: (
+    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18 }}>
+      <path d="M12 3a6 6 0 0 0-6 6c0 4-2 5-2 5h16s-2-1-2-5a6 6 0 0 0-6-6Z" />
+      <path d="M10.5 20a2 2 0 0 0 3 0" />
+    </svg>
+  ),
+  indicadores: (
+    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18 }}>
+      <path d="M4 20V10M10 20V4M16 20v-7M22 20H3" />
+    </svg>
+  ),
+  programacion: (
+    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18 }}>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </svg>
+  ),
+  taxonomia: (
+    <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 18, height: 18 }}>
+      <rect x="9" y="3" width="6" height="5" rx="1" />
+      <rect x="3" y="16" width="6" height="5" rx="1" />
+      <rect x="15" y="16" width="6" height="5" rx="1" />
+      <path d="M12 8v4M6 16v-2h12v2" />
+    </svg>
+  ),
 }
 
 const VISTAS = {
   CATALOGO: 'catalogo',
   FICHA: 'ficha',
   ORDENES: 'ordenes',
+  ALERTAS: 'alertas',
+  INDICADORES: 'indicadores',
+  PROGRAMACION: 'programacion',
+  TAXONOMIA: 'taxonomia',
+}
+
+
+/**
+ * Deja pasar los registros que cumplen TODOS los filtros activos.
+ * Un filtro en cadena vacía no restringe, de modo que «todos» no necesita un
+ * caso especial.
+ *
+ * @param {Object[]} registros
+ * @param {Object<string, string>} filtros
+ */
+function aplicarFiltros(registros, filtros) {
+  return registros.filter((registro) =>
+    Object.entries(filtros).every(
+      ([campo, valor]) => !valor || String(registro[campo] ?? '') === valor,
+    ),
+  )
 }
 
 /**
@@ -79,6 +136,10 @@ function App() {
   const [vista, setVista] = useState(VISTAS.CATALOGO)
   const [idSeleccionado, setIdSeleccionado] = useState(null)
   const [termino, setTermino] = useState('')
+  // { campo: valor }; '' significa «todos». Un objeto y no un estado por
+  // filtro: así añadir uno nuevo no obliga a tocar App.
+  const [filtrosEquipo, setFiltrosEquipo] = useState({ disponibilidad: '', ubicacion: '' })
+  const [filtrosOrden, setFiltrosOrden] = useState({ estado: '', mantenimiento: '' })
   const [ediciones, setEdiciones] = useState({})
   const [propias, setPropias] = useState([])
   const [idsCatalogo, setIdsCatalogo] = useState([])
@@ -138,20 +199,88 @@ function App() {
     [catalogoBase, ediciones],
   )
 
-  // Se recalcula solo cuando cambia el catálogo o el término de búsqueda.
+  // Se recalcula solo cuando cambia el catálogo, la búsqueda o los filtros.
+  // Un filtro vacío no restringe nada, así que no hace falta un caso especial
+  // para «todos»: basta con que `valor` sea cadena vacía.
   const maquinasFiltradas = useMemo(
-    () => filtrarMaquinas(catalogoUsuario, termino),
-    [catalogoUsuario, termino],
+    () => aplicarFiltros(filtrarMaquinas(catalogoUsuario, termino), filtrosEquipo),
+    [catalogoUsuario, termino, filtrosEquipo],
   )
+
+  const ordenesFiltradas = useMemo(() => aplicarFiltros(ordenes, filtrosOrden), [ordenes, filtrosOrden])
+
+  // Alertas e indicadores se DEDUCEN de lo ya registrado; no hay estado propio
+  // que mantener al día. Van en `useMemo` porque recorren todo el catálogo y
+  // todas las órdenes, y hacerlo en cada repintado sería trabajo regalado.
+  //
+  // Se calculan sobre el catálogo COMPLETO, no sobre el filtrado: un filtro de
+  // la pantalla de equipos no debería poder esconder una orden vencida ni
+  // mejorar la disponibilidad.
+  const alertas = useMemo(
+    () => calcularAlertas({ maquinas: catalogoUsuario, ordenes, repuestos }),
+    [catalogoUsuario, ordenes, repuestos],
+  )
+
+  const indicadores = useMemo(
+    () => calcularIndicadores(catalogoUsuario, ordenes),
+    [catalogoUsuario, ordenes],
+  )
+
+  const programacion = useMemo(
+    () => agruparProgramacion(ordenes, catalogoUsuario),
+    [ordenes, catalogoUsuario],
+  )
+
+  const taxonomia = useMemo(() => construirTaxonomia(catalogoUsuario), [catalogoUsuario])
+  const calidad = useMemo(() => calidadDelCatalogo(catalogoUsuario), [catalogoUsuario])
 
   const maquinaSeleccionada =
     catalogoUsuario.find((maquina) => maquina.id === idSeleccionado) ?? null
+
+  /** Cambia un filtro del grupo indicado; '' lo desactiva. */
+  const cambiarFiltro = (asignar) => (campo, valor) =>
+    asignar((previos) => ({ ...previos, [campo]: valor }))
 
   /** Abre la ficha técnica del activo seleccionado. */
   const abrirFicha = (maquina) => {
     setIdSeleccionado(maquina.id)
     setVista(VISTAS.FICHA)
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  /** Abre la ficha de un equipo del que solo se conoce el identificador. */
+  const abrirFichaPorId = (id) => {
+    const maquina = catalogoUsuario.find((m) => m.id === id)
+    if (maquina) abrirFicha(maquina)
+  }
+
+  /**
+   * Lleva a donde apunta una alerta.
+   *
+   * Una alerta que solo informa obliga a buscar a mano el equipo o la orden que
+   * la provoca, y entonces deja de ahorrar trabajo. El `destino` lo decide
+   * `alertas.js`; aquí solo se traduce a navegación.
+   *
+   * @param {{vista: string, id?: string, ref?: string}} destino
+   */
+  const abrirAlerta = (destino) => {
+    if (!destino) return
+
+    if (destino.vista === VISTAS.ORDENES) {
+      setVista(VISTAS.ORDENES)
+      setIdSeleccionado(null)
+      // Deja desplegada la orden señalada, para no buscarla en la lista.
+      setOrdenDesplegada(destino.ref ?? null)
+      return
+    }
+
+    if (destino.id) {
+      abrirFichaPorId(destino.id)
+      return
+    }
+
+    setVista(VISTAS.CATALOGO)
+    setIdSeleccionado(null)
   }
 
   /** Regresa al catálogo conservando el filtro aplicado. */
@@ -401,7 +530,15 @@ function App() {
 
   const modulos = [
     { clave: VISTAS.CATALOGO, texto: 'Equipos', cuenta: catalogoUsuario.length, icono: ICONO.catalogo },
+    // La programación va antes que el listado: es la pregunta del día («¿qué
+    // toca?»), mientras que el listado es el archivo de todo lo registrado.
+    { clave: VISTAS.PROGRAMACION, texto: 'Programación', cuenta: programacion.pendientes, icono: ICONO.programacion },
     { clave: VISTAS.ORDENES, texto: 'Órdenes de trabajo', cuenta: ordenes.length, icono: ICONO.ordenes },
+    { clave: VISTAS.ALERTAS, texto: 'Panel de alertas', cuenta: alertas.length, icono: ICONO.alertas },
+    // Sin contador: «57» al lado de «Indicadores» no significaría nada. La
+    // cobertura real se dice dentro, en el propio panel.
+    { clave: VISTAS.INDICADORES, texto: 'Indicadores', icono: ICONO.indicadores },
+    { clave: VISTAS.TAXONOMIA, texto: 'Taxonomía y datos', icono: ICONO.taxonomia },
   ]
 
   /** Título de la pantalla actual, para la cabecera del contenido. */
@@ -457,13 +594,33 @@ function App() {
             onInicio={volverAlCatalogo}
             onGuardar={aplicarEdicion}
             onEliminar={quitarFicha}
+            onCrearOrden={(id) => setOrdenEnEdicion({ equipo: id })}
+            ordenes={ordenesDeMaquina(ordenes, maquinaSeleccionada.id)}
             repuestos={repuestosDeMaquina(repuestos, maquinaSeleccionada.id)}
             onGuardarRepuesto={aplicarRepuesto}
             onEliminarRepuesto={quitarRepuesto}
           />
         ) : (
           <>
-            {vista === VISTAS.ORDENES ? (
+            {vista === VISTAS.ALERTAS ? (
+              <PanelAlertas alertas={alertas} onAbrir={abrirAlerta} />
+            ) : vista === VISTAS.INDICADORES ? (
+              <Indicadores resultado={indicadores} onAbrirEquipo={abrirFichaPorId} />
+            ) : vista === VISTAS.PROGRAMACION ? (
+              <Programacion
+                resultado={programacion}
+                onNueva={() => setOrdenEnEdicion({})}
+                onEditar={setOrdenEnEdicion}
+                onAbrirEquipo={abrirFichaPorId}
+                sinEquipos={catalogoUsuario.length === 0}
+              />
+            ) : vista === VISTAS.TAXONOMIA ? (
+              <Taxonomia
+                taxonomia={taxonomia}
+                calidad={calidad}
+                onAbrirEquipo={abrirFichaPorId}
+              />
+            ) : vista === VISTAS.ORDENES ? (
               <>
                 <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
                   <p className="text-sm text-gray-500">
@@ -484,8 +641,23 @@ function App() {
                   </button>
                 </div>
 
+                {ordenes.length > 0 && (
+                  <Filtros
+                    filtros={[
+                      { campo: 'estado', etiqueta: 'Todos los estados' },
+                      { campo: 'mantenimiento', etiqueta: 'Todos los tipos' },
+                      { campo: 'prioridad', etiqueta: 'Toda prioridad' },
+                    ]}
+                    valores={filtrosOrden}
+                    onCambiar={cambiarFiltro(setFiltrosOrden)}
+                    datos={ordenes}
+                    resultados={ordenesFiltradas.length}
+                    total={ordenes.length}
+                  />
+                )}
+
                 <ListaOrdenes
-                  ordenes={ordenes}
+                  ordenes={ordenesFiltradas}
                   maquinas={catalogoUsuario}
                   refDesplegada={ordenDesplegada}
                   onDesplegar={setOrdenDesplegada}
@@ -501,6 +673,21 @@ function App() {
                 <Buscador
                   termino={termino}
                   onBuscar={setTermino}
+                  resultados={maquinasFiltradas.length}
+                  total={catalogoUsuario.length}
+                />
+              )}
+
+              {catalogoUsuario.length > 0 && (
+                <Filtros
+                  filtros={[
+                    { campo: 'disponibilidad', etiqueta: 'Todos los estados' },
+                    { campo: 'ubicacion', etiqueta: 'Todas las ubicaciones' },
+                    { campo: 'criticidad', etiqueta: 'Toda criticidad' },
+                  ]}
+                  valores={filtrosEquipo}
+                  onCambiar={cambiarFiltro(setFiltrosEquipo)}
+                  datos={catalogoUsuario}
                   resultados={maquinasFiltradas.length}
                   total={catalogoUsuario.length}
                 />
@@ -635,7 +822,9 @@ function App() {
       {ordenEnEdicion && (
         <FormularioOrden
           // Una orden nueva llega como objeto vacío; una existente trae `ref`.
+          // Si viene de la ficha de un equipo, trae `equipo` y nada más.
           orden={ordenEnEdicion.ref ? ordenEnEdicion : null}
+          equipoInicial={ordenEnEdicion.equipo}
           siguienteNumero={siguienteNumeroOrden(ordenes)}
           maquinas={catalogoUsuario}
           onGuardar={aplicarOrden}

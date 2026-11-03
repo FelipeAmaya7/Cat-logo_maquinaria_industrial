@@ -7,6 +7,7 @@ import { descargarFichaHtml } from "../servicios/exportarHtml";
 import { TIPOS_IMAGEN, prepararFotografia } from "../servicios/imagen";
 import CampoFicha from "./CampoFicha";
 import HistorialRepuestos from "./HistorialRepuestos";
+import HojaDeVida from "./HojaDeVida";
 import { DistintivoSistema } from "./IconoSistema";
 
 /** Marcador que usa el extractor cuando el formato venía sin diligenciar. */
@@ -95,7 +96,18 @@ function validarBorrador(borrador) {
   return errores;
 }
 
-/** Contenedor de la fotografía técnica, con respaldo si el archivo no existe. */
+/**
+ * Fotografía del equipo, en la cabecera de la ficha.
+ *
+ * Estuvo en una columna al lado de la tabla de datos, y esa disposición dejaba
+ * un hueco enorme: la tabla ocupa treinta filas y la foto apenas doscientos
+ * píxeles, así que el resto de la columna quedaba en blanco. Al subirla a la
+ * cabecera, junto a la placa y el nombre, la tabla pasa a ocupar el ancho
+ * completo y se lee mejor, y la foto se ve en cuanto se abre la ficha.
+ *
+ * Mantiene su propio control de carga: la fotografía se cambia donde se ve, no
+ * en un formulario aparte.
+ */
 function FotoTecnica({ maquina, editando, imagen, onCambiarImagen, onError }) {
   const [falloImagen, setFalloImagen] = useState(false);
   // En edicion manda el borrador; en lectura, la ficha guardada.
@@ -116,21 +128,17 @@ function FotoTecnica({ maquina, editando, imagen, onCambiarImagen, onError }) {
   };
 
   return (
-    <figure className="flex h-full flex-col">
-      <figcaption className="border-b border-gray-300 pb-2 text-[11px] font-bold uppercase tracking-wide text-gray-800">
-        Fotografía del equipo
-      </figcaption>
-
-      <div className="flex flex-1 items-center justify-center rounded-md border border-gray-200 bg-gray-50 p-3">
+    <figure className="w-full shrink-0 sm:w-80">
+      <div className="flex h-52 items-center justify-center overflow-hidden rounded-md border border-gray-200 bg-white sm:h-60">
         {src && !falloImagen ? (
           <img
             src={src}
             alt={`Fotografía técnica de ${maquina.descripcion}`}
             onError={() => setFalloImagen(true)}
-            className="max-h-72 w-full rounded object-contain"
+            className="h-full w-full object-contain"
           />
         ) : (
-          <div className="flex w-full flex-col items-center justify-center gap-2 py-16 text-gray-400">
+          <figcaption className="flex flex-col items-center gap-1.5 text-gray-400">
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -138,33 +146,33 @@ function FotoTecnica({ maquina, editando, imagen, onCambiarImagen, onError }) {
               strokeWidth="1.3"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="h-12 w-12"
+              className="h-8 w-8"
               aria-hidden="true"
             >
               <rect x="3" y="4" width="18" height="16" rx="2" />
               <circle cx="8.5" cy="9.5" r="1.5" />
               <path d="m5 18 4.5-5 3 3 2.5-2.5L19 18" />
             </svg>
-            <p className="text-xs text-gray-500">Sin fotografía registrada</p>
-          </div>
+            <span className="text-[11px] text-gray-500">Sin fotografía</span>
+          </figcaption>
         )}
       </div>
 
       {editando && (
-        <div className="flex flex-wrap items-center gap-2 pt-2">
+        <div className="flex flex-wrap items-center gap-1.5 pt-2">
           <button
             type="button"
             onClick={() => entrada.current?.click()}
-            className="rounded border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300"
+            className="rounded border border-gray-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300"
           >
-            {src ? "Cambiar fotografía" : "Añadir fotografía"}
+            {src ? "Cambiar" : "Añadir fotografía"}
           </button>
 
           {src && (
             <button
               type="button"
               onClick={() => onCambiarImagen(null)}
-              className="rounded border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300"
+              className="rounded border border-red-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-red-700 transition hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-300"
             >
               Quitar
             </button>
@@ -179,7 +187,6 @@ function FotoTecnica({ maquina, editando, imagen, onCambiarImagen, onError }) {
           />
         </div>
       )}
-
     </figure>
   );
 }
@@ -295,6 +302,8 @@ function renderValorLectura(definicion, valor) {
  * @param {() => void} props.onInicio                          Regresa a la vista de catálogo.
  * @param {(idMaquina: string, valores: Object<string, string>) => boolean} props.onGuardar
  * @param {(maquina: Object) => void} props.onEliminar  Quita la ficha del catálogo.
+ * @param {Object[]} [props.ordenes]    Órdenes de ESTA máquina, para la hoja de vida.
+ * @param {Object[]} [props.repuestos]  Repuestos de ESTA máquina.
  *        Persiste los valores editables. Devuelve false si no se pudo guardar.
  */
 function FichaTecnica({
@@ -302,6 +311,8 @@ function FichaTecnica({
   onInicio,
   onGuardar,
   onEliminar,
+  ordenes = [],
+  onCrearOrden,
   repuestos = [],
   onGuardarRepuesto,
   onEliminarRepuesto,
@@ -349,6 +360,11 @@ function FichaTecnica({
       inicial[campo] = String(maquina[campo] ?? "");
     }
 
+    // La fotografía viaja en el borrador pero NO por EDITABLES: no es texto, no
+    // se valida y tiene su propio control. Sin esta línea desaparecía al entrar
+    // en edición y volvía a aparecer al salir.
+    inicial.imagen = maquina.imagen ?? null;
+
     setBorrador(inicial);
     setErrores({});
     setError("");
@@ -394,6 +410,10 @@ function FichaTecnica({
     for (const { campo } of EDITABLES) {
       valores[campo] = borrador[campo].trim();
     }
+
+    // Sin esto, los botones de cambiar y quitar la fotografía no hacían nada:
+    // modificaban el borrador y el borrador se descartaba al guardar.
+    valores.imagen = borrador.imagen;
 
     if (!onGuardar(maquina.id, valores)) {
       setError("No se pudieron guardar los cambios en este navegador.");
@@ -561,17 +581,45 @@ function FichaTecnica({
             </p>
           )}
 
-          {/* Identificación del activo */}
-          <div className="flex flex-wrap items-center gap-3 border-b border-gray-300 bg-gray-50 px-5 py-3">
-            <span className="rounded bg-grafito-800 px-2.5 py-1 font-mono text-xs font-semibold text-white">
-              {valorDe("placaNueva")}
-            </span>
-            <h3 className="text-sm font-bold text-gray-800">
-              {valorDe("descripcion")}
-            </h3>
+          {/* Identificación del activo, con su fotografía */}
+          <div className="flex flex-col gap-4 border-b border-gray-300 bg-gray-50 px-5 py-4 sm:flex-row sm:items-start">
+            <FotoTecnica
+              maquina={maquina}
+              editando={editando}
+              imagen={editando ? borrador.imagen : null}
+              onCambiarImagen={(dato) => actualizar("imagen", dato)}
+              onError={setError}
+            />
+
+            <div className="min-w-0 flex-1">
+              <span className="inline-block rounded bg-grafito-800 px-2.5 py-1 font-mono text-xs font-semibold text-white">
+                {valorDe("placaNueva")}
+              </span>
+
+              <h3 className="mt-2 text-base font-bold leading-snug text-gray-900">
+                {valorDe("descripcion")}
+              </h3>
+
+              {/* Los cuatro datos que identifican la máquina antes de leer la tabla. */}
+              <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-xs text-gray-600 sm:grid-cols-2">
+                {[
+                  ["Marca", `${valorDe("marca")} · ${valorDe("modelo")}`],
+                  ["Serie", valorDe("serie")],
+                  ["Ubicación", valorDe("ubicacion")],
+                  ["Estado", `${valorDe("estado")} · ${valorDe("disponibilidad")}`],
+                ].map(([etiqueta, valor]) => (
+                  <div key={etiqueta} className="flex min-w-0 items-baseline gap-1.5">
+                    <dt className="shrink-0 font-semibold text-gray-500">{etiqueta}:</dt>
+                    <dd className="truncate text-gray-800" title={String(valor)}>
+                      {valor}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+          <div className="p-5">
             <div className="-mx-1 overflow-x-auto px-1">
               <table className="w-full border-collapse text-left">
                 <caption className="sr-only">
@@ -585,7 +633,7 @@ function FichaTecnica({
                     <tr key={campo} className="py-2.5 block sm:table-row sm:py-0">
                       <th
                         scope="row"
-                        className="block sm:table-cell sm:w-2/5 sm:py-2.5 sm:pr-4 align-top text-xs font-bold uppercase tracking-wide text-gray-800 pb-1 sm:pb-0"
+                        className="block sm:table-cell sm:w-72 sm:py-2.5 sm:pr-6 align-top text-xs font-bold uppercase tracking-wide text-gray-800 pb-1 sm:pb-0"
                       >
                         <label
                           htmlFor={editando ? `campo-${campo}` : undefined}
@@ -593,7 +641,7 @@ function FichaTecnica({
                           {rotulo}
                         </label>
                       </th>
-                      <td className="block sm:table-cell sm:w-3/5 sm:py-2.5 align-top text-sm text-gray-700">
+                      <td className="block sm:table-cell sm:py-2.5 align-top text-sm text-gray-700">
                         {editando ? (
                           <>
                             <CampoFicha
@@ -623,14 +671,6 @@ function FichaTecnica({
               </table>
             </div>
 
-            {/* Contenedor de la foto técnica */}
-            <FotoTecnica
-              maquina={maquina}
-              editando={editando}
-              imagen={editando ? borrador.imagen : null}
-              onCambiarImagen={(dato) => actualizar("imagen", dato)}
-              onError={setError}
-            />
           </div>
 
           {/* Campos de texto extenso */}
@@ -669,6 +709,19 @@ function FichaTecnica({
               </div>
               )
             })}
+          </div>
+
+          {/*
+            Hoja de vida: lo que le ha pasado a esta máquina. Como el historial,
+            no es un campo de la ficha y no depende de `editando`; es solo
+            lectura, porque cada suceso se registra en su propio módulo.
+          */}
+          <div className="border-t border-gray-300 bg-gray-50 px-5 py-5">
+            <HojaDeVida
+              ordenes={ordenes}
+              repuestos={repuestos}
+              onCrearOrden={onCrearOrden ? () => onCrearOrden(maquina.id) : undefined}
+            />
           </div>
 
           {/*
