@@ -25,6 +25,7 @@
 import { mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs'
 import { extname, resolve } from 'node:path'
 import sharp from 'sharp'
+import { recortarCaptura } from './recorte-captura.mjs'
 
 /**
  * Optimización de las fotografías.
@@ -96,7 +97,13 @@ function leerRelaciones(xml) {
  */
 async function optimizar(datos) {
   try {
-    return await sharp(datos)
+    // Muchas «fotos» del libro son capturas del Explorador con la imagen en el
+    // panel de vista previa. Se recortan ANTES de reescalar: al revés, el
+    // reescalado reparte los 1200 px entre la ventana y la máquina, y la
+    // máquina acaba con la mitad de resolución de la que podría tener.
+    const { datos: recortados } = await recortarCaptura(sharp, datos)
+
+    return await sharp(recortados)
       .rotate()
       .resize({ width: OPTIMIZACION.anchoMaximo, withoutEnlargement: true })
       .webp({ quality: OPTIMIZACION.calidadWebp })

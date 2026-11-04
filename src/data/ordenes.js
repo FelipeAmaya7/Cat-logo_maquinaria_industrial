@@ -1,6 +1,14 @@
 /**
  * Órdenes de trabajo: definición de campos para mantenimiento de maquinaria de planta.
  *
+ * El ESTADO gobierna el resto del sistema: «Ejecutada» con su fecha alimenta
+ * el cálculo del próximo mantenimiento y los indicadores; «Programada» y «En
+ * proceso» son las que aparecen como pendientes y, pasada su fecha, vencidas.
+ *
+ * El ESTADO gobierna el resto del sistema: «Ejecutada», con su fecha, alimenta
+ * el cálculo del próximo mantenimiento y los indicadores; «Programada» y «En
+ * proceso» son las pendientes y, pasada su fecha, las vencidas.
+ *
  * `tipo` describe el control que se pinta en el formulario:
  *   'equipo' → desplegable de máquinas del catálogo
  *   'auto'   → se rellena solo al elegir el equipo, y queda de solo lectura
@@ -11,7 +19,7 @@
 
 export const CAMPOS_ORDEN = [
   { campo: 'numero', rotulo: 'N° de orden', tipo: 'numero', requerido: true, soloLectura: true },
-  { campo: 'fecha', rotulo: 'Fecha', tipo: 'fecha', requerido: true },
+  { campo: 'fecha', rotulo: 'Fecha programada', tipo: 'fecha', requerido: true },
   { campo: 'equipo', rotulo: 'Equipo a intervenir', tipo: 'equipo', requerido: true },
   { campo: 'ubicacion', rotulo: 'Ubicación', ph: 'Ej. Nave 1, Línea de corrugado, Troquelado' },
   { campo: 'marca', rotulo: 'Marca', tipo: 'auto', ph: 'Se completa al elegir el equipo' },
@@ -19,15 +27,44 @@ export const CAMPOS_ORDEN = [
   { campo: 'serie', rotulo: 'Serie', tipo: 'auto', ph: 'Se completa al elegir el equipo' },
   {
     campo: 'mantenimiento',
-    rotulo: 'Mantenimiento',
+    rotulo: 'Tipo',
     tipo: 'select',
     opciones: ['Correctivo', 'Preventivo', 'Predictivo'],
+    requerido: true,
+  },
+  {
+    campo: 'prioridad',
+    rotulo: 'Prioridad',
+    tipo: 'select',
+    opciones: ['Alta', 'Media', 'Baja'],
+  },
+  {
+    campo: 'estado',
+    rotulo: 'Estado',
+    tipo: 'select',
+    opciones: ['Programada', 'En proceso', 'Ejecutada'],
+    requerido: true,
+  },
+  {
+    campo: 'fechaEjecucion',
+    rotulo: 'Fecha de ejecución',
+    tipo: 'fecha',
+    // Solo tiene sentido una vez ejecutada. De ella sale la «última ejecutada»
+    // con la que se calcula el próximo mantenimiento del equipo.
   },
   { campo: 'insumos', rotulo: 'Insumos / repuestos', ph: 'Ej. Rodamientos, cuchillas, bandas de transmisión, sellos' },
   { campo: 'tecnico', rotulo: 'Técnico', ph: 'Nombre del técnico' },
   { campo: 'falla', rotulo: 'Falla', ph: 'Descripción de la falla' },
   { campo: 'sistemaIntervenido', rotulo: 'Sistema intervenido', ph: 'Ej. Sistema neumático, transmisión mecánica, sistema eléctrico' },
-  { campo: 'duracion', rotulo: 'Duración de la reparación', ph: 'Ej. 2 horas' },
+  // En horas y como número, no como texto libre: de aquí salen el MTTR y el
+  // tiempo de mantenimiento. Con «dos horas y media» escrito a mano no hay
+  // indicador que calcular.
+  {
+    campo: 'duracion',
+    rotulo: 'Duración (horas)',
+    tipo: 'numero',
+    ph: 'Ej. 2.5',
+  },
   { campo: 'seguridad', rotulo: 'Seguridad', ph: 'Elementos y medidas de seguridad usadas' },
   { campo: 'observaciones', rotulo: 'Observaciones', tipo: 'area', ph: 'Observaciones generales' },
   { campo: 'tecnicoResponsable', rotulo: 'Técnico responsable', ph: 'Nombre' },
@@ -49,6 +86,9 @@ const ORDEN_EN_HOJA = [
   'serie',
   'ubicacion',
   'mantenimiento',
+  'prioridad',
+  'estado',
+  'fechaEjecucion',
   'insumos',
   'tecnico',
   'falla',
@@ -72,6 +112,9 @@ export function ordenEnBlanco(numero) {
     ...valores,
     numero: String(numero),
     fecha: new Date().toISOString().slice(0, 10),
+    // Una orden nace programada: es el estado natural al crearla.
+    estado: 'Programada',
+    prioridad: 'Media',
   }
 }
 
@@ -94,4 +137,19 @@ export function aplicarDatosDeEquipo(borrador, maquina) {
     modelo: maquina.modelo ?? '',
     serie: maquina.serie ?? '',
   }
+}
+
+/**
+ * Órdenes de una máquina, de la más reciente a la más antigua.
+ *
+ * Ordena por la fecha de EJECUCIÓN cuando existe y por la programada cuando
+ * no: una orden ejecutada con retraso pertenece al día en que se hizo, no al
+ * día en que se pensaba hacer.
+ */
+export function ordenesDeMaquina(ordenes, idMaquina) {
+  const cuando = (orden) => String(orden.fechaEjecucion || orden.fecha || '')
+
+  return ordenes
+    .filter((orden) => orden.equipo === idMaquina)
+    .sort((a, b) => cuando(b).localeCompare(cuando(a)))
 }

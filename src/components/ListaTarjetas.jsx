@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import { resolverFotografia } from '../data/fotografias'
+
 /**
  * Criticidad: una misma familia con intensidad creciente.
  *
@@ -37,6 +40,55 @@ const normalizar = (texto) =>
 const SIN_DATO = 'No registrado'
 
 /**
+ * Miniatura del equipo.
+ *
+ * Estuvo retirada un tiempo porque las fotografías del libro eran capturas del
+ * Explorador y en una franja de tarjeta se veía el listado de archivos y no la
+ * máquina. Ya vienen recortadas (`scripts/recorte-captura.mjs`), así que la
+ * imagen vuelve a aportar.
+ *
+ * `object-cover` recorta para llenar la franja sin deformar; las 23 fichas que
+ * siguen sin foto caen en un marcador del mismo alto, para que la cuadrícula no
+ * se descuadre.
+ */
+function Miniatura({ maquina }) {
+  const [falloImagen, setFalloImagen] = useState(false)
+  const src = resolverFotografia(maquina.imagen)
+
+  if (!src || falloImagen) {
+    return (
+      <div className="flex h-36 w-full items-center justify-center bg-grafito-100 text-grafito-400">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-9 w-9"
+          aria-hidden="true"
+        >
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <circle cx="8.5" cy="9.5" r="1.5" />
+          <path d="m5 18 4.5-5 3 3 2.5-2.5L19 18" />
+        </svg>
+        <span className="sr-only">Sin fotografía registrada</span>
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={src}
+      alt={`Fotografía de ${maquina.descripcion}`}
+      loading="lazy"
+      onError={() => setFalloImagen(true)}
+      className="h-36 w-full bg-grafito-100 object-cover transition duration-200 group-hover:scale-[1.03]"
+    />
+  )
+}
+
+/**
  * Tarjeta individual del catálogo.
  *
  * SIN fotografía, a propósito. Las imágenes del libro de planta son capturas de
@@ -51,7 +103,9 @@ function Tarjeta({ maquina, onSeleccionar }) {
   const estiloBadge = ESTILO_CRITICIDAD[criticidad] ?? ESTILO_POR_DEFECTO
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-acento-400 hover:shadow-md">
+    <article className="group flex flex-col overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-acento-400 hover:shadow-md">
+      <Miniatura maquina={maquina} />
+
       <div className="flex flex-1 flex-col gap-2.5 p-3.5">
         <div className="flex items-start justify-between gap-2">
           <span className="font-mono text-[11px] font-semibold tracking-wide text-grafito-500">

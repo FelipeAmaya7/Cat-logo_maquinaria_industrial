@@ -2,9 +2,42 @@ import { Fragment } from 'react'
 import { CAMPOS_ORDEN } from '../data/ordenes'
 
 /** Columnas de la tabla: las demás se ven al desplegar la orden. */
-const COLUMNAS_VISIBLES = ['numero', 'fecha', 'equipo', 'mantenimiento', 'tecnico']
+const COLUMNAS_VISIBLES = [
+  'numero',
+  'equipo',
+  'mantenimiento',
+  'prioridad',
+  'estado',
+  'fecha',
+  'tecnico',
+]
 
 const ROTULO = Object.fromEntries(CAMPOS_ORDEN.map(({ campo, rotulo }) => [campo, rotulo]))
+
+/**
+ * Distintivos de tipo, prioridad y estado.
+ *
+ * El color aquí es dato, no adorno: en una tabla de treinta órdenes es lo que
+ * permite localizar de un vistazo lo correctivo, lo urgente y lo que sigue sin
+ * ejecutarse, sin leer fila por fila.
+ */
+const ESTILO_TIPO = {
+  Correctivo: 'text-red-700',
+  Preventivo: 'text-acento-700',
+  Predictivo: 'text-violet-700',
+}
+
+const ESTILO_PRIORIDAD = {
+  Alta: 'bg-red-100 text-red-800 ring-red-200',
+  Media: 'bg-amber-50 text-amber-800 ring-amber-200',
+  Baja: 'bg-grafito-100 text-grafito-600 ring-grafito-200',
+}
+
+const COLOR_ESTADO = {
+  Ejecutada: 'bg-emerald-500',
+  'En proceso': 'bg-amber-500',
+  Programada: 'bg-grafito-400',
+}
 
 /** Campos que se muestran al desplegar una fila. */
 const CAMPOS_DETALLE = CAMPOS_ORDEN.filter(({ campo }) => !COLUMNAS_VISIBLES.includes(campo))
@@ -96,7 +129,31 @@ function ListaOrdenes({ ordenes, maquinas, refDesplegada, onDesplegar, onEditar,
                           campo === 'numero' ? 'font-mono font-semibold text-gray-900' : ''
                         }`}
                       >
-                        {celda(orden, campo)}
+                        {campo === 'mantenimiento' ? (
+                          <span className={`font-semibold ${ESTILO_TIPO[orden.mantenimiento] ?? ''}`}>
+                            {celda(orden, campo)}
+                          </span>
+                        ) : campo === 'prioridad' ? (
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${
+                              ESTILO_PRIORIDAD[orden.prioridad] ?? 'bg-grafito-50 text-grafito-500 ring-grafito-200'
+                            }`}
+                          >
+                            {celda(orden, campo)}
+                          </span>
+                        ) : campo === 'estado' ? (
+                          <span className="flex items-center gap-1.5 whitespace-nowrap">
+                            <span
+                              className={`h-2 w-2 shrink-0 rounded-full ${
+                                COLOR_ESTADO[orden.estado] ?? 'bg-grafito-300'
+                              }`}
+                              aria-hidden="true"
+                            />
+                            {celda(orden, campo)}
+                          </span>
+                        ) : (
+                          celda(orden, campo)
+                        )}
                       </td>
                     ))}
 
