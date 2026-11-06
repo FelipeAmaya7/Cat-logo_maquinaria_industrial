@@ -24,11 +24,17 @@
 import { ORDENES_EJEMPLO } from './ordenes-ejemplo'
 
 /**
- * Fecha y número de la orden indicada, por su `ref`.
+ * Datos que la entrada de repuesto toma de su orden, por el `ref` de esta.
  *
- * La entrada de repuesto hereda la fecha de su orden en lugar de llevarla
- * escrita: así las dos caen el mismo día en la línea de tiempo aunque las
- * fechas de las órdenes se recalculen en cada carga.
+ * Fecha, equipo y técnico NO se escriben en el guion de abajo: se heredan. El
+ * motivo es que escribirlos dos veces es poder contradecirse, y ya pasó: una
+ * entrada quedó colgada de la orden equivocada y aparecía una pieza instalada
+ * en una máquina que nunca la llevó. Heredando, la única cosa que hay que
+ * acertar es a qué orden se engancha, y de eso se encarga una prueba.
+ *
+ * La fecha se toma de la EJECUCIÓN, no de la programación: la pieza se monta el
+ * día en que se interviene. Por eso un repuesto solo puede colgar de una orden
+ * ejecutada, y `npm test` lo comprueba.
  */
 function deLaOrden(ref) {
   const orden = ORDENES_EJEMPLO.find((o) => o.ref === ref)
@@ -36,6 +42,7 @@ function deLaOrden(ref) {
     fecha: orden?.fechaEjecucion || orden?.fecha || '',
     numero: orden ? String(orden.numero) : '',
     equipo: orden?.equipo ?? '',
+    tecnico: orden?.tecnico ?? '',
   }
 }
 
@@ -53,7 +60,6 @@ const GUION = [
     cantidad: '1',
     costoUnitario: '2850000',
     proveedor: 'Windmöller & Hölscher Colombia',
-    instaladoPor: 'Jairo Peña',
     motivo: 'Desgaste del recubrimiento; provocaba registro de color fuera de tolerancia.',
   },
   {
@@ -63,7 +69,6 @@ const GUION = [
     cantidad: '2',
     costoUnitario: '185000',
     proveedor: 'Sellos y Empaques Industriales',
-    instaladoPor: 'Jairo Peña',
     motivo: 'Fuga de tinta por endurecimiento del sello. Se cambió el juego completo.',
   },
   {
@@ -73,7 +78,6 @@ const GUION = [
     cantidad: '1',
     costoUnitario: '640000',
     proveedor: 'Bandas del Valle',
-    instaladoPor: 'Hernán Rojas',
     motivo: 'Ruptura por fatiga tras aproximadamente dos años de servicio.',
   },
   {
@@ -83,7 +87,6 @@ const GUION = [
     cantidad: '3',
     costoUnitario: '95000',
     proveedor: 'Electrotérmicos S.A.S',
-    instaladoPor: 'Hernán Rojas',
     motivo: 'Sellado irregular en el fondo de la bolsa por resistencia parcialmente abierta.',
   },
   {
@@ -93,7 +96,6 @@ const GUION = [
     cantidad: '2',
     costoUnitario: '420000',
     proveedor: 'Herramientas de Corte Andina',
-    instaladoPor: 'Jairo Peña',
     motivo: 'Filo vencido; causaba atascamientos repetidos en la estación de corte.',
   },
   {
@@ -103,7 +105,6 @@ const GUION = [
     cantidad: '1',
     costoUnitario: '310000',
     proveedor: 'Suministros Eléctricos del Norte',
-    instaladoPor: 'Hernán Rojas',
     motivo: 'Contactos pegados; el variador presentaba paradas intermitentes.',
   },
   {
@@ -113,7 +114,6 @@ const GUION = [
     cantidad: '1',
     costoUnitario: '168000',
     proveedor: 'Neumática Industrial Ltda',
-    instaladoPor: 'Hernán Rojas',
     motivo: 'No cortaba a la presión de consigna; riesgo de sobrepresión en el tanque.',
   },
   {
@@ -123,7 +123,6 @@ const GUION = [
     cantidad: '1',
     costoUnitario: '240000',
     proveedor: 'Lubricantes del Oriente',
-    instaladoPor: 'Luis Carvajal',
     motivo: 'Cambio programado por horas de servicio.',
   },
   {
@@ -133,34 +132,40 @@ const GUION = [
     cantidad: '1',
     costoUnitario: '520000',
     proveedor: 'Fundiciones Técnicas',
-    instaladoPor: 'Jairo Peña',
     motivo: 'Juego excesivo en el carro transversal por desgaste del filete.',
   },
   {
-    orden: 'ejemplo-ot-22',
+    orden: 'ejemplo-ot-21',
     repuesto: 'Resistencia de inmersión para tina de parafina',
     referencia: 'RI-3000W-220',
     cantidad: '1',
     costoUnitario: '430000',
     proveedor: 'Electrotérmicos S.A.S',
-    instaladoPor: 'Jairo Peña',
     motivo: 'Resistencia abierta; la tina no alcanzaba la temperatura de trabajo.',
   },
   {
-    orden: 'ejemplo-ot-28',
+    orden: 'ejemplo-ot-24',
+    repuesto: 'Juego de cuchillas circulares de refilado',
+    referencia: 'CR-180-HSS',
+    cantidad: '4',
+    costoUnitario: '165000',
+    proveedor: 'Herramientas de Corte Andina',
+    motivo: 'Filo vencido; dejaba rebabas en el borde de las tiras.',
+  },
+  {
+    orden: 'ejemplo-ot-30',
     repuesto: 'Rodamientos de motor del alimentador',
     referencia: '6205-2RSH',
     cantidad: '2',
     costoUnitario: '48000',
     proveedor: 'Rodamientos del Valle',
-    instaladoPor: 'Hernán Rojas',
     motivo: 'Ruido y sobrecalentamiento del motor por rodamientos en mal estado.',
   },
 ]
 
 /** Entradas de ejemplo con la forma que guarda la aplicación. */
 export const REPUESTOS_EJEMPLO = GUION.map((fila, indice) => {
-  const { fecha, numero, equipo } = deLaOrden(fila.orden)
+  const { fecha, numero, equipo, tecnico } = deLaOrden(fila.orden)
 
   return {
     ref: `ejemplo-rp-${String(indice + 1).padStart(2, '0')}`,
@@ -171,7 +176,7 @@ export const REPUESTOS_EJEMPLO = GUION.map((fila, indice) => {
     cantidad: fila.cantidad,
     costoUnitario: fila.costoUnitario,
     proveedor: fila.proveedor,
-    instaladoPor: fila.instaladoPor,
+    instaladoPor: tecnico,
     ordenTrabajo: numero,
     motivo: fila.motivo,
   }

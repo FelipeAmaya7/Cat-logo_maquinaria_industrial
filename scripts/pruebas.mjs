@@ -207,15 +207,35 @@ console.log('--- DATOS DE EJEMPLO')
 const D = new URL('../src/data', import.meta.url).href
 const { ORDENES_EJEMPLO } = await import(`${D}/ordenes-ejemplo.js`)
 const { REPUESTOS_EJEMPLO } = await import(`${D}/repuestos-ejemplo.js`)
-const { maquinas: CATALOGO } = await import(`${D}/maquinas.js`)
+const { maquinas: LIBRO } = await import(`${D}/maquinas.js`)
+const { catalogoInicial: CATALOGO, IDS_REFERENCIA } = await import(`${D}/catalogo.js`)
 
 const idsCatalogo = new Set(CATALOGO.map((m) => m.id))
 const equiposConOrden = new Set(ORDENES_EJEMPLO.map((o) => o.equipo))
 
+// EL CATALOGO DE REFERENCIA
+//
+// Se recorto el libro de planta a doce fichas escogidas a mano. Una lista
+// escrita a mano contra un archivo GENERADO (`npm run datos` rehace
+// `maquinas.js` desde el Excel) es justo donde se cuelan los desajustes: basta
+// que el Excel cambie una placa para que el catalogo se quede corto en
+// silencio. Por eso se comprueba aqui y no en la interfaz.
+es('el catalogo de referencia tiene 12 fichas', CATALOGO.length, 12)
+es('no sobra ni falta ninguna respecto a la lista', CATALOGO.length, IDS_REFERENCIA.length)
+cierto('todo id de referencia existe en el libro de planta',
+  IDS_REFERENCIA.every((id) => LIBRO.some((m) => m.id === id)))
+cierto('ningun id repetido en la lista de referencia',
+  new Set(IDS_REFERENCIA).size === IDS_REFERENCIA.length)
+cierto('las doce tienen fotografia, que es la razon de haberlas elegido',
+  CATALOGO.every((m) => Boolean(m.imagen)))
+cierto('ninguna placa repetida: el defecto del libro no entra en la muestra',
+  new Set(CATALOGO.map((m) => m.placaNueva)).size === CATALOGO.length)
+
 cierto('hay ordenes de ejemplo', ORDENES_EJEMPLO.length >= 25)
 es('cubren 10 equipos', equiposConOrden.size, 10)
-cierto('todo equipo referenciado existe en el catalogo',
+cierto('todo equipo referenciado existe en el catalogo de referencia',
   [...equiposConOrden].every((id) => idsCatalogo.has(id)))
+es('dos equipos quedan sin historial, a proposito', CATALOGO.length - equiposConOrden.size, 2)
 cierto('ninguna ref repetida', new Set(ORDENES_EJEMPLO.map((o) => o.ref)).size === ORDENES_EJEMPLO.length)
 cierto('ningun numero de orden repetido', new Set(ORDENES_EJEMPLO.map((o) => o.numero)).size === ORDENES_EJEMPLO.length)
 cierto('todo estado es uno de los tres validos',
@@ -255,7 +275,7 @@ cierto('al menos 4 equipos con 2+ correctivos, para que el MTBF promedie',
 // Las vistas, alimentadas con los ejemplos.
 const indEj = calcularIndicadores(CATALOGO, ORDENES_EJEMPLO)
 es('los 10 equipos quedan cubiertos por los indicadores', indEj.cubiertas, 10)
-es('el total del catalogo sigue siendo 49', indEj.total, 49)
+es('el total que reporta el indicador es el del catalogo', indEj.total, 12)
 cierto('disponibilidad global entre 0 y 1', indEj.totales.a > 0 && indEj.totales.a <= 1)
 cierto('MTTR global razonable (entre 1 y 12 h)', indEj.totales.mttr >= 1 && indEj.totales.mttr <= 12)
 cierto('MTBF global positivo y menor que el periodo', indEj.totales.mtbf > 0 && indEj.totales.mtbf < indEj.totales.periodo)
@@ -288,6 +308,47 @@ cierto('el gasto total es mayor que cero, para que la hoja de vida no muestre $0
   REPUESTOS_EJEMPLO.reduce((t, r) => t + Number(r.cantidad) * Number(r.costoUnitario), 0) > 0)
 cierto('cada repuesto cita el numero de su orden',
   REPUESTOS_EJEMPLO.every((r) => ORDENES_EJEMPLO.some((o) => String(o.numero) === String(r.ordenTrabajo))))
+
+// COHERENCIA REPUESTO <-> ORDEN
+//
+// Aqui habia dos desajustes de verdad, y ninguno rompia nada: una entrada
+// colgaba de la orden equivocada y mostraba una pieza montada en una maquina
+// que nunca la llevo, con fecha FUTURA ademas, porque esa orden todavia estaba
+// programada. La hoja de vida lo habria ensenado tal cual. Ahora la entrada
+// hereda equipo, fecha y tecnico de su orden, y lo unico que hay que acertar
+// es a que orden se engancha. Esto comprueba ese enganche.
+const ordenDe = (r) => ORDENES_EJEMPLO.find((o) => String(o.numero) === String(r.ordenTrabajo))
+cierto('todo repuesto cuelga de una orden EJECUTADA, no de una pendiente',
+  REPUESTOS_EJEMPLO.every((r) => ordenDe(r)?.estado === 'Ejecutada'))
+cierto('el repuesto es del mismo equipo que su orden',
+  REPUESTOS_EJEMPLO.every((r) => ordenDe(r)?.equipo === r.idMaquina))
+cierto('el repuesto lleva la fecha de ejecucion de su orden',
+  REPUESTOS_EJEMPLO.every((r) => ordenDe(r)?.fechaEjecucion === r.fecha))
+cierto('lo instala el tecnico que firmo la orden',
+  REPUESTOS_EJEMPLO.every((r) => ordenDe(r)?.tecnico === r.instaladoPor))
+const hoyISO = new Date().toLocaleDateString('en-CA')
+cierto('ninguna pieza esta instalada en el futuro',
+  REPUESTOS_EJEMPLO.every((r) => r.fecha <= hoyISO))
+cierto('el motivo del repuesto habla de la misma falla que la orden',
+  REPUESTOS_EJEMPLO.every((r) => Boolean(r.motivo) && Boolean(r.referencia) && Boolean(r.proveedor)))
+
+// LA TAXONOMIA DE LAS DOCE
+//
+// Dos de las doce entraron para que el arbol tenga un nivel 7 real: EM00014
+// es el sistema hidraulico de la impresora EM00012. Sin esa pareja el arbol
+// seria plano y la vista no demostraria la parte de la norma que dice
+// sostener.
+const taxEj = construirTaxonomia(CATALOGO)
+es('el arbol reparte las doce en seis secciones', taxEj.resumen.secciones, 6)
+es('once equipos y una subunidad', taxEj.resumen.equipos, 11)
+es('la subunidad de nivel 7 existe', taxEj.resumen.subunidades, 1)
+cierto('y es EM00014 colgando de EM00012',
+  taxEj.secciones
+    .flatMap((sec) => sec.equipos)
+    .some((eq) => eq.maquina.id === 'EM00012' && eq.subunidades.some((su) => su.id === 'EM00014')))
+es('ninguna ficha huerfana: ningun padre apunta fuera del catalogo', taxEj.huerfanas.length, 0)
+cierto('la seccion de cada ficha es su campo UBICACION',
+  taxEj.secciones.every((sec) => sec.equipos.every((eq) => eq.maquina.ubicacion === sec.nombre)))
 
 // ───────────────────────────────────────────────────────────────────────────
 // EL SEMBRADO

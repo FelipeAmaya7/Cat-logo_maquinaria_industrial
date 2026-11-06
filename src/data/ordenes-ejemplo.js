@@ -14,7 +14,7 @@
  * ---------------------------
  * El catálogo de equipos viaja dentro del código: `maquinas.js` se genera del
  * libro de Excel y Vite lo empaqueta, así que cualquiera que abra el enlace ve
- * las 49 fichas. Las órdenes de trabajo, en cambio, viven en `localStorage`,
+ * las fichas. Las órdenes de trabajo, en cambio, viven en `localStorage`,
  * que es por navegador y por dispositivo: lo que una persona registra no existe
  * para nadie más. Resultado: las tres vistas más útiles —programación,
  * indicadores y hoja de vida— aparecían vacías para cualquier visitante.
@@ -25,8 +25,15 @@
  *
  * CÓMO ESTÁ COMPUESTO Y POR QUÉ ASÍ
  * ---------------------------------
- * Diez equipos de seis secciones distintas, con dos a cuatro órdenes cada uno.
- * El reparto no es decorativo:
+ * Diez de los doce equipos del catálogo (`IDS_REFERENCIA` en `catalogo.js`),
+ * de seis secciones distintas, con dos a cuatro órdenes cada uno.
+ *
+ * Los dos que quedan sin historial —EM00012 y EM00014— no son un olvido: así
+ * los indicadores dicen «cobertura 10 de 12» y se ve que la aplicación
+ * distingue entre un equipo sin fallas y un equipo sin datos. Con las doce
+ * cubiertas, esa diferencia no se apreciaría.
+ *
+ * El reparto tampoco es decorativo:
  *
  * - Varias órdenes por equipo, no una. El MTBF es `TTO / N` y el MTTF
  *   `TTO / (N+1)`: con una sola falla por máquina, N = 1 y el MTBF sería todo
@@ -408,9 +415,12 @@ const GUION = [
     duracionNota: 'En intervención: se está desmontando la tina para cambiar el empaque.',
   },
 
-  // ─── EM00038 · REFILADO · Máquina cortadora de rollos ───
+  // ─── EM00030 · REFILADO · Máquina cortadora refiladora ───
+  // Su ficha dice «fraccionar el papel en tiras», con un desbobinador y tres
+  // embobinadores: de ahí que las órdenes hablen de tiras y de embobinado, y
+  // no de rollos. Es la máquina más antigua de las doce (1985).
   {
-    equipo: 'EM00038',
+    equipo: 'EM00030',
     dias: -287,
     ejecutadaEn: -287,
     tipo: 'Correctivo',
@@ -418,13 +428,13 @@ const GUION = [
     prioridad: 'Media',
     duracion: '4',
     tecnico: 'Hernán Rojas',
-    falla: 'Rebabas en el borde del rollo por cuchilla desgastada',
+    falla: 'Rebabas en el borde de las tiras por cuchilla de refilado desgastada',
     sistema: 'Sistema de corte',
     insumos: 'Cuchilla circular',
-    duracionNota: 'Cambio del juego de cuchillas circulares.',
+    duracionNota: 'Cambio del juego de cuchillas circulares de refilado.',
   },
   {
-    equipo: 'EM00038',
+    equipo: 'EM00030',
     dias: -121,
     ejecutadaEn: -121,
     tipo: 'Preventivo',
@@ -435,18 +445,19 @@ const GUION = [
     falla: '',
     sistema: 'Transmisión mecánica',
     insumos: 'Grasa EP2',
-    duracionNota: 'Lubricación de rodamientos y revisión de frenos de desenrollado.',
+    duracionNota: 'Lubricación de rodamientos y revisión del freno del desbobinador.',
   },
   {
     // Para hoy: alimenta la ventana «hoy».
-    equipo: 'EM00038',
+    equipo: 'EM00030',
     dias: 0,
     tipo: 'Preventivo',
     estado: 'Programada',
     prioridad: 'Media',
     sistema: 'Sistema de corte',
     insumos: 'Cuchilla circular',
-    duracionNota: 'Revisión del filo de cuchillas. Programada para hoy.',
+    duracionNota:
+      'Revisión del filo de las cuchillas y de la tensión en los tres embobinadores. Programada para hoy.',
   },
 
   // ─── EM00041 · EMBOLSADO · Báscula digital Pesatronik ───

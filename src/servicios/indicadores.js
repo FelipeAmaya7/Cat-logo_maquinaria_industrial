@@ -15,7 +15,7 @@
  * Una máquina solo se puede calcular si tiene historia de mantenimiento. Sin
  * ella no hay periodo contra el que medir, y el resultado se inventaría. Por
  * eso `calcularIndicadores` informa de cuántas máquinas quedaron fuera: es
- * preferible decir «3 de 49» a promediar sobre datos que no existen.
+ * preferible decir «10 de 12» a promediar sobre datos que no existen.
  */
 
 import { aFecha } from './fechas'

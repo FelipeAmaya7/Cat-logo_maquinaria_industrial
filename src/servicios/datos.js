@@ -23,7 +23,7 @@ const CLAVE_VERSION = 'version-catalogo'
 
 
 /** Versión de la asignación inicial; subirla fuerza una resincronización. */
-const VERSION_CATALOGO = 4
+const VERSION_CATALOGO = 5
 
 /**
  * ¿Esta colección está sin estrenar?
@@ -78,8 +78,8 @@ export async function sembrarDatosIniciales() {
  *
  * Si el navegador bloquea el almacenamiento —ventana privada, datos de sitio
  * desactivados— el sembrado no pudo escribir nada y esto devolvería una lista
- * vacía: la aplicación anunciaría que no hay fichas teniendo las 49 dentro del
- * propio paquete. Por eso la ausencia de clave cae en el catálogo de fábrica.
+ * vacía: la aplicación anunciaría que no hay fichas teniendo el catálogo dentro
+ * del propio paquete. Por eso la ausencia de clave cae en el catálogo de fábrica.
  *
  * Un catálogo vaciado a propósito SÍ es una lista vacía guardada, y esa se
  * respeta: solo se recurre al de fábrica cuando no hay clave en absoluto.
@@ -369,7 +369,7 @@ export function vaciarTodo() {
   }
 
   // Sin esto el vaciado era irreversible: la versión seguía al día, el sembrado
-  // no volvía a ejecutarse y las 49 fichas de planta no regresaban nunca. Al
+  // no volvía a ejecutarse y las fichas de planta no regresaban nunca. Al
   // retirar la versión, la próxima carga vuelve a sembrar el catálogo.
   borrar(CLAVE_VERSION)
 
