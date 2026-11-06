@@ -195,6 +195,184 @@ es('completos + faltantes = total', (() => { const f = calidadDeFicha(maquinas[0
 es('catalogo vacio da 0 y no NaN', calidadDelCatalogo([]).porcentaje, 0)
 es('tonos', [tonoDeCalidad(0.95), tonoDeCalidad(0.8), tonoDeCalidad(0.7), tonoDeCalidad(0.3)], ['emerald', 'emerald', 'amber', 'red'])
 
+// ───────────────────────────────────────────────────────────────────────────
+// DATOS DE EJEMPLO
+//
+// Son los que verá cualquiera que abra la aplicación publicada, así que tienen
+// que cumplir solos lo que la interfaz da por supuesto: que el equipo exista,
+// que una orden ejecutada traiga duración, que las fechas sean coherentes. Un
+// ejemplo mal formado no rompe la aplicación: la deja mintiendo en silencio.
+// ───────────────────────────────────────────────────────────────────────────
+console.log('--- DATOS DE EJEMPLO')
+const D = new URL('../src/data', import.meta.url).href
+const { ORDENES_EJEMPLO } = await import(`${D}/ordenes-ejemplo.js`)
+const { REPUESTOS_EJEMPLO } = await import(`${D}/repuestos-ejemplo.js`)
+const { maquinas: CATALOGO } = await import(`${D}/maquinas.js`)
+
+const idsCatalogo = new Set(CATALOGO.map((m) => m.id))
+const equiposConOrden = new Set(ORDENES_EJEMPLO.map((o) => o.equipo))
+
+cierto('hay ordenes de ejemplo', ORDENES_EJEMPLO.length >= 25)
+es('cubren 10 equipos', equiposConOrden.size, 10)
+cierto('todo equipo referenciado existe en el catalogo',
+  [...equiposConOrden].every((id) => idsCatalogo.has(id)))
+cierto('ninguna ref repetida', new Set(ORDENES_EJEMPLO.map((o) => o.ref)).size === ORDENES_EJEMPLO.length)
+cierto('ningun numero de orden repetido', new Set(ORDENES_EJEMPLO.map((o) => o.numero)).size === ORDENES_EJEMPLO.length)
+cierto('todo estado es uno de los tres validos',
+  ORDENES_EJEMPLO.every((o) => ['Programada', 'En proceso', 'Ejecutada'].includes(o.estado)))
+cierto('todo tipo es uno de los tres validos',
+  ORDENES_EJEMPLO.every((o) => ['Correctivo', 'Preventivo', 'Predictivo'].includes(o.mantenimiento)))
+
+// Sin estas dos, una orden no entra en los indicadores y el ejemplo no sirve.
+const ejecutadas = ORDENES_EJEMPLO.filter((o) => o.estado === 'Ejecutada')
+cierto('hay suficientes ejecutadas', ejecutadas.length >= 18)
+cierto('toda ejecutada tiene fecha de ejecucion', ejecutadas.every((o) => o.fechaEjecucion))
+cierto('toda ejecutada tiene duracion numerica',
+  ejecutadas.every((o) => Number.isFinite(Number(o.duracion)) && Number(o.duracion) > 0))
+cierto('ninguna se ejecuto antes de programarse',
+  ejecutadas.every((o) => o.fechaEjecucion >= o.fecha))
+cierto('ninguna pendiente trae fecha de ejecucion',
+  ORDENES_EJEMPLO.filter((o) => o.estado !== 'Ejecutada').every((o) => !o.fechaEjecucion))
+cierto('marca y modelo salen de la ficha, no de una copia a mano',
+  ORDENES_EJEMPLO.every((o) => {
+    const m = CATALOGO.find((x) => x.id === o.equipo)
+    return o.marca === (m.marca ?? '') && o.modelo === (m.modelo ?? '') && o.serie === (m.serie ?? '')
+  }))
+
+// Varias ordenes por equipo: con una sola, el MTBF es todo el periodo y no
+// informa de nada. Esta es la razon de que sean ~30 y no 10.
+const porEquipo = {}
+for (const o of ORDENES_EJEMPLO) porEquipo[o.equipo] = (porEquipo[o.equipo] ?? 0) + 1
+cierto('cada equipo tiene entre 2 y 4 ordenes',
+  Object.values(porEquipo).every((n) => n >= 2 && n <= 4))
+const correctivosPorEquipo = {}
+for (const o of ejecutadas.filter((x) => x.mantenimiento === 'Correctivo')) {
+  correctivosPorEquipo[o.equipo] = (correctivosPorEquipo[o.equipo] ?? 0) + 1
+}
+cierto('al menos 4 equipos con 2+ correctivos, para que el MTBF promedie',
+  Object.values(correctivosPorEquipo).filter((n) => n >= 2).length >= 4)
+
+// Las vistas, alimentadas con los ejemplos.
+const indEj = calcularIndicadores(CATALOGO, ORDENES_EJEMPLO)
+es('los 10 equipos quedan cubiertos por los indicadores', indEj.cubiertas, 10)
+es('el total del catalogo sigue siendo 49', indEj.total, 49)
+cierto('disponibilidad global entre 0 y 1', indEj.totales.a > 0 && indEj.totales.a <= 1)
+cierto('MTTR global razonable (entre 1 y 12 h)', indEj.totales.mttr >= 1 && indEj.totales.mttr <= 12)
+cierto('MTBF global positivo y menor que el periodo', indEj.totales.mtbf > 0 && indEj.totales.mtbf < indEj.totales.periodo)
+cierto('toda fila tiene disponibilidad valida', indEj.matriz.every((f) => f.a > 0 && f.a <= 1))
+cierto('ninguna fila con mas mantenimiento que periodo', indEj.matriz.every((f) => f.mt <= f.periodo))
+
+const progEj = agruparProgramacion(ORDENES_EJEMPLO, CATALOGO)
+const conOrdenes = progEj.grupos.filter((g) => g.ordenes.length > 0).map((g) => g.clave)
+cierto('la programacion llena al menos 4 ventanas distintas', conOrdenes.length >= 4)
+cierto('hay vencidas, para que se vea el caso urgente', progEj.vencidas >= 1)
+cierto('hay algo para hoy', progEj.grupos.find((g) => g.clave === 'hoy').ordenes.length >= 1)
+es('pendientes = ordenes no ejecutadas', progEj.pendientes, ORDENES_EJEMPLO.length - ejecutadas.length)
+
+const alertasEj = calcularAlertas({ maquinas: CATALOGO, ordenes: ORDENES_EJEMPLO, repuestos: REPUESTOS_EJEMPLO })
+cierto('las alertas encuentran algo que decir', alertasEj.length > 0)
+cierto('alguna alerta es de orden vencida', alertasEj.some((a) => a.clave.startsWith('orden-') && a.gravedad === 'alta'))
+
+// Repuestos: la hoja de vida mezcla las dos colecciones, asi que deben casar.
+cierto('hay repuestos de ejemplo', REPUESTOS_EJEMPLO.length >= 8)
+cierto('ninguna ref de repuesto repetida',
+  new Set(REPUESTOS_EJEMPLO.map((r) => r.ref)).size === REPUESTOS_EJEMPLO.length)
+cierto('todo repuesto apunta a un equipo del catalogo',
+  REPUESTOS_EJEMPLO.every((r) => idsCatalogo.has(r.idMaquina)))
+cierto('todo repuesto cuelga de un equipo que tiene ordenes',
+  REPUESTOS_EJEMPLO.every((r) => equiposConOrden.has(r.idMaquina)))
+cierto('todo repuesto tiene fecha', REPUESTOS_EJEMPLO.every((r) => Boolean(r.fecha)))
+cierto('cantidad y costo son numeros positivos',
+  REPUESTOS_EJEMPLO.every((r) => Number(r.cantidad) > 0 && Number(r.costoUnitario) > 0))
+cierto('el gasto total es mayor que cero, para que la hoja de vida no muestre $0',
+  REPUESTOS_EJEMPLO.reduce((t, r) => t + Number(r.cantidad) * Number(r.costoUnitario), 0) > 0)
+cierto('cada repuesto cita el numero de su orden',
+  REPUESTOS_EJEMPLO.every((r) => ORDENES_EJEMPLO.some((o) => String(o.numero) === String(r.ordenTrabajo))))
+
+// ───────────────────────────────────────────────────────────────────────────
+// EL SEMBRADO
+//
+// Es la parte con riesgo real: si sembrara sin comprobar, al subir la version
+// del catalogo borraria el historial de quien ya use la aplicacion. Las tres
+// ramas se prueban con un localStorage simulado.
+// ───────────────────────────────────────────────────────────────────────────
+console.log('--- SEMBRADO')
+
+/** localStorage de mentira, suficiente para lo que usa `almacenamiento.js`. */
+function montarAlmacen(inicial = {}) {
+  const datos = new Map(Object.entries(inicial))
+  globalThis.window = {
+    localStorage: {
+      getItem: (k) => (datos.has(k) ? datos.get(k) : null),
+      setItem: (k, v) => datos.set(k, String(v)),
+      removeItem: (k) => datos.delete(k),
+      get length() { return datos.size },
+      key: (i) => [...datos.keys()][i] ?? null,
+    },
+  }
+  // Object.keys(window.localStorage) lo usa la migracion de claves antiguas.
+  for (const k of datos.keys()) globalThis.window.localStorage[k] = datos.get(k)
+  return datos
+}
+
+const P = 'fichas-tecnicas:'
+
+// Rama 1: navegador nuevo, ninguna clave. Debe sembrar.
+{
+  const datos = montarAlmacen()
+  const { sembrarDatosIniciales, leerOrdenes, leerRepuestos } = await import(`${S}/datos.js?r=1`)
+  await sembrarDatosIniciales()
+  es('navegador nuevo: siembra las ordenes', JSON.parse(datos.get(P + 'ordenes-trabajo')).length, ORDENES_EJEMPLO.length)
+  es('navegador nuevo: siembra los repuestos', JSON.parse(datos.get(P + 'repuestos')).length, REPUESTOS_EJEMPLO.length)
+  es('navegador nuevo: leerOrdenes las devuelve', leerOrdenes().length, ORDENES_EJEMPLO.length)
+  es('navegador nuevo: leerRepuestos los devuelve', leerRepuestos().length, REPUESTOS_EJEMPLO.length)
+}
+
+// Rama 2: clave presente pero vacia (el caso de quien borro sus pruebas).
+// Debe sembrar: no hay nada que perder.
+{
+  const datos = montarAlmacen({ [P + 'ordenes-trabajo']: '[]', [P + 'repuestos']: '[]' })
+  const { sembrarDatosIniciales } = await import(`${S}/datos.js?r=2`)
+  await sembrarDatosIniciales()
+  es('lista vacia: siembra igualmente', JSON.parse(datos.get(P + 'ordenes-trabajo')).length, ORDENES_EJEMPLO.length)
+}
+
+// Rama 3: LA IMPORTANTE. Hay ordenes propias. No debe tocarlas.
+{
+  const mias = [{ ref: 'mia-1', numero: '901', equipo: 'EM00034', estado: 'Ejecutada', fecha: '2026-01-15', fechaEjecucion: '2026-01-15', duracion: '3', mantenimiento: 'Correctivo' }]
+  const datos = montarAlmacen({
+    [P + 'ordenes-trabajo']: JSON.stringify(mias),
+    [P + 'repuestos']: JSON.stringify([{ ref: 'mio-1', idMaquina: 'EM00034', fecha: '2026-01-15', repuesto: 'Pieza mia' }]),
+  })
+  const { sembrarDatosIniciales, leerOrdenes } = await import(`${S}/datos.js?r=3`)
+  await sembrarDatosIniciales()
+  es('ordenes propias: NO se sobrescriben', JSON.parse(datos.get(P + 'ordenes-trabajo')), mias)
+  es('ordenes propias: leerOrdenes devuelve las suyas', leerOrdenes().length, 1)
+  es('repuestos propios: NO se sobrescriben', JSON.parse(datos.get(P + 'repuestos')).length, 1)
+  cierto('ordenes propias: el catalogo si se resincroniza', datos.has(P + 'catalogo'))
+}
+
+// Rama 4: idempotencia. Sembrar dos veces no duplica nada.
+{
+  const datos = montarAlmacen()
+  const { sembrarDatosIniciales } = await import(`${S}/datos.js?r=4`)
+  await sembrarDatosIniciales()
+  const primera = datos.get(P + 'ordenes-trabajo')
+  await sembrarDatosIniciales()
+  es('sembrar dos veces no cambia nada', datos.get(P + 'ordenes-trabajo'), primera)
+}
+
+delete globalThis.window
+
+// El aviso de que son datos inventados tiene que estar en el archivo: es lo
+// que impide que alguien los confunda con el historial real de la planta.
+const { readFileSync } = await import('node:fs')
+for (const archivo of ['ordenes-ejemplo.js', 'repuestos-ejemplo.js']) {
+  const texto = readFileSync(new URL(`../src/data/${archivo}`, import.meta.url), 'utf8')
+  cierto(`${archivo} advierte que no son datos reales`,
+    /NO SON EL HISTORIAL REAL/.test(texto))
+}
+
 console.log('\n=========================================')
 console.log(`  ${ok} comprobaciones pasaron`)
 if (fallos.length) {
