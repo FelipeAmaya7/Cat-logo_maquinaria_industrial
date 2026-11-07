@@ -1,7 +1,7 @@
 /**
  * Calidad de los datos de las fichas.
  *
- * Módulo PURO. Un catálogo de 49 equipos no sirve de nada si media ficha está
+ * Módulo PURO. Un catálogo de equipos no sirve de nada si media ficha está
  * en blanco: los indicadores salen sesgados, la taxonomía queda coja y nadie
  * sabe qué falta hasta que lo necesita. Esto lo mide y lo pone por delante.
  *

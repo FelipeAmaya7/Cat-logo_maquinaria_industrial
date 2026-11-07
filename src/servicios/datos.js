@@ -11,6 +11,8 @@
  */
 import { borrar, escribir, leer } from './almacenamiento'
 import { idsCatalogoInicial } from '../data/catalogo'
+import { ORDENES_EJEMPLO } from '../data/ordenes-ejemplo'
+import { REPUESTOS_EJEMPLO } from '../data/repuestos-ejemplo'
 
 const CLAVE_CATALOGO = 'catalogo'
 const CLAVE_EDICIONES = 'ediciones'
@@ -21,22 +23,53 @@ const CLAVE_VERSION = 'version-catalogo'
 
 
 /** Versión de la asignación inicial; subirla fuerza una resincronización. */
-const VERSION_CATALOGO = 3
-
-
+const VERSION_CATALOGO = 5
 
 /**
- * Prepara el catálogo la primera vez que se abre la aplicación.
+ * ¿Esta colección está sin estrenar?
+ *
+ * Distingue «nunca se guardó nada» y «se guardó una lista vacía» de «hay
+ * registros de la persona». Es la condición que hace seguro el sembrado de
+ * ejemplos: sin ella, subir `VERSION_CATALOGO` sobrescribiría el historial real
+ * de quien ya viniera usando la aplicación, y sería una pérdida silenciosa.
+ *
+ * Una lista vacía sí se puede sembrar: no hay nada que perder.
+ */
+function sinEstrenar(clave) {
+  const guardado = leer(clave, null)
+  return guardado === null || (Array.isArray(guardado) && guardado.length === 0)
+}
+
+/**
+ * Prepara los datos la primera vez que se abre la aplicación.
  *
  * Es idempotente y está versionado: al cambiar la definición del catálogo
  * inicial se sube `VERSION_CATALOGO` y esa única vez se resincroniza. Sin eso,
  * un navegador que ya hubiera abierto la aplicación conservaría para siempre
  * una lista de identificadores que quizá ya no existen.
+ *
+ * ADEMÁS DEL CATÁLOGO, SIEMBRA ÓRDENES Y REPUESTOS DE EJEMPLO
+ * -----------------------------------------------------------
+ * El catálogo de equipos viaja en el paquete de la aplicación, así que todo el
+ * mundo lo ve. Las órdenes y los repuestos viven solo en el navegador de quien
+ * los escribe, de modo que un visitante encontraba la programación, los
+ * indicadores y las hojas de vida vacías: las tres vistas que más aportan.
+ *
+ * No hacía falta un servidor, hacía falta una semilla. Estos ejemplos la
+ * proveen, y se marcan como tales en su propio archivo.
+ *
+ * El catálogo se reescribe en cada subida de versión, porque es una asignación
+ * que la aplicación controla. Los ejemplos NO: solo entran si la colección está
+ * sin estrenar, para no pisar jamás lo que alguien haya registrado.
  */
 export async function sembrarDatosIniciales() {
   if (leer(CLAVE_VERSION, 0) === VERSION_CATALOGO) return
 
   escribir(CLAVE_CATALOGO, idsCatalogoInicial)
+
+  if (sinEstrenar(CLAVE_ORDENES)) escribir(CLAVE_ORDENES, ORDENES_EJEMPLO)
+  if (sinEstrenar(CLAVE_REPUESTOS)) escribir(CLAVE_REPUESTOS, REPUESTOS_EJEMPLO)
+
   escribir(CLAVE_VERSION, VERSION_CATALOGO)
 }
 
@@ -45,8 +78,8 @@ export async function sembrarDatosIniciales() {
  *
  * Si el navegador bloquea el almacenamiento —ventana privada, datos de sitio
  * desactivados— el sembrado no pudo escribir nada y esto devolvería una lista
- * vacía: la aplicación anunciaría que no hay fichas teniendo las 49 dentro del
- * propio paquete. Por eso la ausencia de clave cae en el catálogo de fábrica.
+ * vacía: la aplicación anunciaría que no hay fichas teniendo el catálogo dentro
+ * del propio paquete. Por eso la ausencia de clave cae en el catálogo de fábrica.
  *
  * Un catálogo vaciado a propósito SÍ es una lista vacía guardada, y esa se
  * respeta: solo se recurre al de fábrica cuando no hay clave en absoluto.
@@ -180,7 +213,15 @@ export function eliminarMaquina(idMaquina) {
  * @returns {Object[]}
  */
 export function leerOrdenes() {
-  return leer(CLAVE_ORDENES, [])
+  // Sin clave en absoluto se cae a los ejemplos, por el mismo motivo que
+  // `idsDelCatalogo` cae al catálogo de fábrica: si el navegador bloquea el
+  // almacenamiento —ventana privada, datos de sitio desactivados— el sembrado
+  // no pudo escribir nada, y la aplicación anunciaría que no hay órdenes
+  // teniéndolas dentro del propio paquete.
+  //
+  // Una lista vacía GUARDADA sí se respeta: significa que alguien borró sus
+  // órdenes a propósito, y volver a meterle los ejemplos sería desobedecerle.
+  return leer(CLAVE_ORDENES, null) ?? ORDENES_EJEMPLO
 }
 
 /**
@@ -239,7 +280,9 @@ export function eliminarOrden(ref) {
  * @returns {Object[]}
  */
 export function leerRepuestos() {
-  return leer(CLAVE_REPUESTOS, [])
+  // Mismo criterio que `leerOrdenes`: sin clave, los ejemplos; lista vacía
+  // guardada, se respeta.
+  return leer(CLAVE_REPUESTOS, null) ?? REPUESTOS_EJEMPLO
 }
 
 /**
@@ -326,7 +369,7 @@ export function vaciarTodo() {
   }
 
   // Sin esto el vaciado era irreversible: la versión seguía al día, el sembrado
-  // no volvía a ejecutarse y las 49 fichas de planta no regresaban nunca. Al
+  // no volvía a ejecutarse y las fichas de planta no regresaban nunca. Al
   // retirar la versión, la próxima carga vuelve a sembrar el catálogo.
   borrar(CLAVE_VERSION)
 

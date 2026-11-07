@@ -94,8 +94,9 @@ function Miniatura({ maquina }) {
  * SIN fotografía, a propósito. Las imágenes del libro de planta son capturas de
  * pantalla: traen un listado de archivos pegado a la izquierda y la máquina a la
  * derecha, así que en una franja de tarjeta se ve el listado y no el equipo.
- * Además solo 26 de las 49 fichas tienen imagen. La fotografía se muestra en la
- * ficha técnica, donde hay sitio para verla entera.
+ * Y una ficha puede no tener imagen: las doce de referencia sí la tienen, pero
+ * las que añade la persona desde la aplicación empiezan sin ninguna. La
+ * fotografía se muestra en la ficha técnica, donde hay sitio para verla entera.
  */
 function Tarjeta({ maquina, onSeleccionar }) {
   const criticidad = normalizar(maquina.criticidad)
